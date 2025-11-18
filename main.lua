@@ -787,7 +787,7 @@ local function createMainWindow()
 	sendBtn.AutoButtonColor = false
 	createUICorner(4).Parent = sendBtn
 
-	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn
+	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, scanFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn
 end
 
 -- ========================
@@ -1713,7 +1713,7 @@ local function populateScanTab(scanFrame, screenGui)
 	descLabel.Position = UDim2.new(0, 20, 0, 50)
 	descLabel.Size = UDim2.new(1, -40, 0, 60)
 	descLabel.BackgroundTransparency = 1
-	titleLabel.Font = CONFIG.Font
+	descLabel.Font = CONFIG.Font
 	descLabel.Text = "Comprehensive vulnerability scanner that analyzes anti-cheat systems, remote endpoints, script patterns, environment pollution, GUI injections, memory leaks, and generates detailed security reports.\n\nClick RUN SCAN to begin comprehensive analysis."
 	descLabel.TextColor3 = CONFIG.Colors.TextDim
 	descLabel.TextSize = 12
@@ -4291,7 +4291,7 @@ local function setupChatSpy(chatScroll)
 end
 
 local function initialize()
-	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn = createMainWindow()
+	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, scanFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn = createMainWindow()
 
 	-- Store reference for show/hide functions
 	debugToolInstance = screenGui
@@ -4534,6 +4534,8 @@ local function initialize()
 				remotesHeader.Visible = true
 			elseif State.currentTab == "Tools" then
 				toolsFrame.Visible = true
+			elseif State.currentTab == "Scan" then
+				scanFrame.Visible = true
 			elseif State.currentTab == "Chat" then
 				chatFrame.Visible = true
 			elseif State.currentTab == "Settings" then
@@ -4551,6 +4553,7 @@ local function initialize()
 			remotesFrame.Visible = false
 			remotesHeader.Visible = false
 			toolsFrame.Visible = false
+			scanFrame.Visible = false
 			chatFrame.Visible = false
 			settingsFrame.Visible = false
 			minimizeBtn.Text = "□"

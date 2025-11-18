@@ -133,6 +133,12 @@ end
 -- RESULTS WINDOW SYSTEM
 -- ========================
 
+local function createUICorner(radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	return corner
+end
+
 local function createResultsWindow(title, content, parentGui)
 	-- Create overlay
 	local overlay = Instance.new("Frame")
@@ -253,12 +259,6 @@ local function createResultsWindow(title, content, parentGui)
 	end)
 
 	return overlay
-end
-
-local function createUICorner(radius)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, radius)
-	return corner
 end
 
 local function createButton(parent, text, position, size, callback)
@@ -2936,31 +2936,61 @@ local function initialize()
 		if message and message ~= "" then
 			if chatSystemType == "TextChatService" then
 				-- NEW: Use TextChatService
-				pcall(function()
-					-- Find the default chat channel
-					local channels = TextChatService:GetChildren()
-					for _, channel in ipairs(channels) do
-						if channel:IsA("TextChannel") and (channel.Name == "RBXGeneral" or channel.Name == "RBXSystem") then
-							channel:SendAsync(message)
-							chatInputBox.Text = ""
-							return
+				local success = pcall(function()
+					-- Get the local player's text channel
+					local textChannel = TextChatService:FindFirstChild("TextChannels")
+					if textChannel then
+						textChannel = textChannel:FindFirstChild("RBXGeneral")
+					end
+
+					-- Alternative: try to get from player's chat
+					if not textChannel then
+						local channels = TextChatService:GetDescendants()
+						for _, channel in ipairs(channels) do
+							if channel:IsA("TextChannel") and (channel.Name == "RBXGeneral" or channel.Name == "RBXTeam") then
+								textChannel = channel
+								break
+							end
 						end
 					end
-					-- Fallback: try to send to first available channel
-					if #channels > 0 and channels[1]:IsA("TextChannel") then
-						channels[1]:SendAsync(message)
+
+					if textChannel and textChannel:IsA("TextChannel") then
+						textChannel:SendAsync(message)
+						chatInputBox.Text = ""
+						return
+					end
+
+					-- Last resort: use Players.LocalPlayer.Chatted
+					LocalPlayer.Chatted:Fire(message)
+					chatInputBox.Text = ""
+				end)
+
+				if not success then
+					-- If TextChatService failed, try legacy as fallback
+					chatSystemType = "Legacy"
+					sendChatMessage()
+				end
+			elseif chatSystemType == "Legacy" then
+				-- LEGACY: Use DefaultChatSystemChatEvents
+				local success = pcall(function()
+					local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+					if chatEvents then
+						local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
+						if saymsg then
+							saymsg:FireServer(message, "All")
+							chatInputBox.Text = ""
+						end
+					else
+						-- Try alternative: direct Player.Chatted
+						LocalPlayer.Chatted:Fire(message)
 						chatInputBox.Text = ""
 					end
 				end)
-			elseif chatSystemType == "Legacy" then
-				-- LEGACY: Use DefaultChatSystemChatEvents
-				local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-				if chatEvents then
-					local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
-					if saymsg then
-						saymsg:FireServer(message, "All")
-						chatInputBox.Text = ""
-					end
+
+				if not success then
+					chatInputBox.PlaceholderText = "Failed to send message!"
+					task.wait(2)
+					chatInputBox.PlaceholderText = "Type message... (Enter to send)"
 				end
 			else
 				-- Unknown chat system - show error

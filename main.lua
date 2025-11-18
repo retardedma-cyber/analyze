@@ -45,6 +45,8 @@ local State = {
 	frozen = false,
 	frozenData = nil,
 	hiddenGuis = {}, -- {[instance] = true}
+	frozenIndividual = {}, -- {[instance] = {children snapshot}}
+	searchQuery = "", -- Current search filter
 }
 
 -- ========================
@@ -232,26 +234,27 @@ local function createMainWindow()
 	separator.BackgroundColor3 = CONFIG.Colors.Border
 	separator.BorderSizePixel = 0
 
-	-- Toolbar (Freeze toggle)
+	-- Toolbar (Freeze toggle + Search)
 	local toolbar = Instance.new("Frame")
 	toolbar.Name = "Toolbar"
 	toolbar.Parent = mainFrame
 	toolbar.Position = UDim2.new(0, 0, 0, 36)
-	toolbar.Size = UDim2.new(1, 0, 0, 40)
+	toolbar.Size = UDim2.new(1, 0, 0, 70)
 	toolbar.BackgroundColor3 = CONFIG.Colors.Background
 	toolbar.BorderSizePixel = 0
 
+	-- First row: Freeze button
 	local freezeBtn = Instance.new("TextButton")
 	freezeBtn.Name = "FreezeButton"
 	freezeBtn.Parent = toolbar
-	freezeBtn.Position = UDim2.new(0, 10, 0.5, -15)
-	freezeBtn.Size = UDim2.new(0, 100, 0, 30)
+	freezeBtn.Position = UDim2.new(0, 10, 0, 5)
+	freezeBtn.Size = UDim2.new(0, 100, 0, 28)
 	freezeBtn.BackgroundColor3 = CONFIG.Colors.Button
 	freezeBtn.BorderSizePixel = 0
 	freezeBtn.Font = CONFIG.Font
-	freezeBtn.Text = "FREEZE"
+	freezeBtn.Text = "FREEZE ALL"
 	freezeBtn.TextColor3 = CONFIG.Colors.Text
-	freezeBtn.TextSize = 14
+	freezeBtn.TextSize = 13
 	freezeBtn.AutoButtonColor = false
 	createUICorner(4).Parent = freezeBtn
 
@@ -259,7 +262,7 @@ local function createMainWindow()
 	statusLabel.Name = "StatusLabel"
 	statusLabel.Parent = toolbar
 	statusLabel.Position = UDim2.new(0, 120, 0, 0)
-	statusLabel.Size = UDim2.new(1, -130, 1, 0)
+	statusLabel.Size = UDim2.new(1, -130, 0, 35)
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = CONFIG.Font
 	statusLabel.Text = "Ready"
@@ -267,12 +270,57 @@ local function createMainWindow()
 	statusLabel.TextSize = 12
 	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 
+	-- Second row: Search box
+	local searchLabel = Instance.new("TextLabel")
+	searchLabel.Name = "SearchLabel"
+	searchLabel.Parent = toolbar
+	searchLabel.Position = UDim2.new(0, 10, 0, 38)
+	searchLabel.Size = UDim2.new(0, 50, 0, 28)
+	searchLabel.BackgroundTransparency = 1
+	searchLabel.Font = CONFIG.Font
+	searchLabel.Text = "Search:"
+	searchLabel.TextColor3 = CONFIG.Colors.Text
+	searchLabel.TextSize = 12
+	searchLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local searchBox = Instance.new("TextBox")
+	searchBox.Name = "SearchBox"
+	searchBox.Parent = toolbar
+	searchBox.Position = UDim2.new(0, 65, 0, 38)
+	searchBox.Size = UDim2.new(1, -140, 0, 28)
+	searchBox.BackgroundColor3 = CONFIG.Colors.Button
+	searchBox.BorderSizePixel = 0
+	searchBox.Font = CONFIG.Font
+	searchBox.PlaceholderText = "Type to filter GUIs..."
+	searchBox.Text = ""
+	searchBox.TextColor3 = CONFIG.Colors.Text
+	searchBox.PlaceholderColor3 = CONFIG.Colors.TextDim
+	searchBox.TextSize = 12
+	searchBox.TextXAlignment = Enum.TextXAlignment.Left
+	searchBox.ClearTextOnFocus = false
+	createUICorner(4).Parent = searchBox
+
+	-- Clear search button
+	local clearSearchBtn = Instance.new("TextButton")
+	clearSearchBtn.Name = "ClearSearchButton"
+	clearSearchBtn.Parent = toolbar
+	clearSearchBtn.Position = UDim2.new(1, -65, 0, 38)
+	clearSearchBtn.Size = UDim2.new(0, 55, 0, 28)
+	clearSearchBtn.BackgroundColor3 = CONFIG.Colors.Button
+	clearSearchBtn.BorderSizePixel = 0
+	clearSearchBtn.Font = CONFIG.Font
+	clearSearchBtn.Text = "CLEAR"
+	clearSearchBtn.TextColor3 = CONFIG.Colors.TextDim
+	clearSearchBtn.TextSize = 11
+	clearSearchBtn.AutoButtonColor = false
+	createUICorner(4).Parent = clearSearchBtn
+
 	-- Content Frame
 	local contentFrame = Instance.new("ScrollingFrame")
 	contentFrame.Name = "ContentFrame"
 	contentFrame.Parent = mainFrame
-	contentFrame.Position = UDim2.new(0, 10, 0, 86)
-	contentFrame.Size = UDim2.new(1, -20, 1, -96)
+	contentFrame.Position = UDim2.new(0, 10, 0, 116)
+	contentFrame.Size = UDim2.new(1, -20, 1, -126)
 	contentFrame.BackgroundColor3 = CONFIG.Colors.Background
 	contentFrame.BorderSizePixel = 0
 	contentFrame.ScrollBarThickness = 6
@@ -285,7 +333,7 @@ local function createMainWindow()
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	listLayout.Padding = UDim.new(0, 2)
 
-	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel
+	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn
 end
 
 -- ========================
@@ -466,6 +514,21 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 		sourceLabel.TextXAlignment = Enum.TextXAlignment.Left
 	end
 
+	-- FREEZE Button (individual)
+	local freezeIndividualBtn = Instance.new("TextButton")
+	freezeIndividualBtn.Name = "FreezeIndividualButton"
+	freezeIndividualBtn.Parent = entry
+	freezeIndividualBtn.Position = UDim2.new(1, -195, 0, 5)
+	freezeIndividualBtn.Size = UDim2.new(0, 35, 0, 22)
+	freezeIndividualBtn.BackgroundColor3 = State.frozenIndividual[obj] and CONFIG.Colors.AccentBlue or CONFIG.Colors.Button
+	freezeIndividualBtn.BorderSizePixel = 0
+	freezeIndividualBtn.Font = CONFIG.Font
+	freezeIndividualBtn.Text = "FRZ"
+	freezeIndividualBtn.TextColor3 = CONFIG.Colors.Text
+	freezeIndividualBtn.TextSize = 10
+	freezeIndividualBtn.AutoButtonColor = false
+	createUICorner(3).Parent = freezeIndividualBtn
+
 	-- ATTACH Button
 	local attachBtn = Instance.new("TextButton")
 	attachBtn.Name = "AttachButton"
@@ -522,6 +585,31 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 		hideBtn.BackgroundColor3 = State.hiddenGuis[obj] and CONFIG.Colors.AccentRed or CONFIG.Colors.Button
 	end)
 
+	-- Freeze individual button logic
+	freezeIndividualBtn.MouseButton1Click:Connect(function()
+		if State.frozenIndividual[obj] then
+			-- Unfreeze
+			State.frozenIndividual[obj] = nil
+			freezeIndividualBtn.BackgroundColor3 = CONFIG.Colors.Button
+			print("Unfroze:", obj.Name)
+			-- Refresh to show live children
+			if onRefresh then
+				onRefresh()
+			end
+		else
+			-- Freeze - capture current children
+			local childrenSnapshot = {}
+			for _, child in ipairs(obj:GetChildren()) do
+				if child:IsA("GuiObject") or isGuiRoot(child) then
+					table.insert(childrenSnapshot, child)
+				end
+			end
+			State.frozenIndividual[obj] = childrenSnapshot
+			freezeIndividualBtn.BackgroundColor3 = CONFIG.Colors.AccentBlue
+			print("Frozen:", obj.Name, "with", #childrenSnapshot, "children")
+		end
+	end)
+
 	-- Expand functionality
 	if expandBtn then
 		local childContainer = nil
@@ -562,8 +650,9 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 				childLayout.SortOrder = Enum.SortOrder.LayoutOrder
 				childLayout.Padding = UDim.new(0, 2)
 
-				-- Add children (only 1 level deep)
-				for i, child in ipairs(obj:GetChildren()) do
+				-- Add children (use frozen snapshot if available)
+				local childrenToDisplay = State.frozenIndividual[obj] or obj:GetChildren()
+				for i, child in ipairs(childrenToDisplay) do
 					if child:IsA("GuiObject") or isGuiRoot(child) then
 						local childEntry = createGuiEntry(childContainer, child, depth + 1, onRefresh)
 						childEntry.LayoutOrder = i
@@ -574,6 +663,18 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 	end
 
 	return wrapper
+end
+
+local function matchesSearch(obj, query)
+	if query == "" then
+		return true
+	end
+
+	-- Case-insensitive search
+	local lowerQuery = string.lower(query)
+	local lowerName = string.lower(obj.Name)
+
+	return string.find(lowerName, lowerQuery, 1, true) ~= nil
 end
 
 local function scanAndDisplayGuis(contentFrame, statusLabel)
@@ -622,8 +723,21 @@ local function scanAndDisplayGuis(contentFrame, statusLabel)
 		statusLabel.TextColor3 = CONFIG.Colors.AccentGreen
 	end
 
-	-- Display all root GUIs
-	for i, gui in ipairs(guiList) do
+	-- Filter by search query
+	local filteredList = {}
+	for _, gui in ipairs(guiList) do
+		if matchesSearch(gui, State.searchQuery) then
+			table.insert(filteredList, gui)
+		end
+	end
+
+	-- Update status with filter info
+	if State.searchQuery ~= "" then
+		statusLabel.Text = statusLabel.Text .. " | Filtered: " .. #filteredList .. "/" .. #guiList
+	end
+
+	-- Display filtered root GUIs
+	for i, gui in ipairs(filteredList) do
 		local entry = createGuiEntry(contentFrame, gui, 0, function()
 			scanAndDisplayGuis(contentFrame, statusLabel)
 		end)
@@ -678,7 +792,7 @@ end
 -- ========================
 
 local function initialize()
-	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel = createMainWindow()
+	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn = createMainWindow()
 
 	-- Store reference for show/hide functions
 	debugToolInstance = screenGui
@@ -686,6 +800,24 @@ local function initialize()
 	-- Make draggable
 	local topBar = mainFrame:FindFirstChild("TopBar")
 	makeDraggable(mainFrame, topBar)
+
+	-- Search functionality
+	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		State.searchQuery = searchBox.Text
+		scanAndDisplayGuis(contentFrame, statusLabel)
+	end)
+
+	clearSearchBtn.MouseEnter:Connect(function()
+		clearSearchBtn.BackgroundColor3 = CONFIG.Colors.ButtonHover
+	end)
+	clearSearchBtn.MouseLeave:Connect(function()
+		clearSearchBtn.BackgroundColor3 = CONFIG.Colors.Button
+	end)
+	clearSearchBtn.MouseButton1Click:Connect(function()
+		searchBox.Text = ""
+		State.searchQuery = ""
+		scanAndDisplayGuis(contentFrame, statusLabel)
+	end)
 
 	-- Close button (hides instead of destroying)
 	closeBtn.MouseButton1Click:Connect(function()
@@ -736,14 +868,14 @@ local function initialize()
 
 			State.frozenData = guiList
 			freezeBtn.BackgroundColor3 = CONFIG.Colors.AccentBlue
-			freezeBtn.Text = "UNFREEZE"
+			freezeBtn.Text = "UNFREEZE ALL"
 			statusLabel.Text = "Frozen | " .. #guiList .. " root GUIs"
 			statusLabel.TextColor3 = CONFIG.Colors.AccentBlue
 		else
 			-- Unfreeze
 			State.frozenData = nil
 			freezeBtn.BackgroundColor3 = CONFIG.Colors.Button
-			freezeBtn.Text = "FREEZE"
+			freezeBtn.Text = "FREEZE ALL"
 			scanAndDisplayGuis(contentFrame, statusLabel)
 		end
 	end)

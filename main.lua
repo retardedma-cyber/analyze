@@ -1011,8 +1011,11 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		previewWindow.BackgroundColor3 = CONFIG.Colors.Background
 		previewWindow.BorderSizePixel = 1
 		previewWindow.BorderColor3 = CONFIG.Colors.Border
-		previewWindow.ZIndex = 2000
+		previewWindow.ZIndex = 10000
 		createUICorner(8).Parent = previewWindow
+
+		-- Store reference to preview window
+		moreMenu = previewWindow
 
 		-- Preview window title bar
 		local previewTitleBar = Instance.new("Frame")
@@ -1020,6 +1023,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		previewTitleBar.Size = UDim2.new(1, 0, 0, 30)
 		previewTitleBar.BackgroundColor3 = CONFIG.Colors.TopBar
 		previewTitleBar.BorderSizePixel = 0
+		previewTitleBar.ZIndex = 10001
 		createUICorner(8).Parent = previewTitleBar
 
 		local previewTitle = Instance.new("TextLabel")
@@ -1033,6 +1037,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		previewTitle.TextSize = 13
 		previewTitle.TextXAlignment = Enum.TextXAlignment.Left
 		previewTitle.TextTruncate = Enum.TextTruncate.AtEnd
+		previewTitle.ZIndex = 10002
 
 		-- Close button for preview
 		local previewCloseBtn = Instance.new("TextButton")
@@ -1046,11 +1051,21 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		previewCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 		previewCloseBtn.TextSize = 14
 		previewCloseBtn.AutoButtonColor = false
+		previewCloseBtn.ZIndex = 10003
 		createUICorner(3).Parent = previewCloseBtn
 
+		previewCloseBtn.MouseEnter:Connect(function()
+			previewCloseBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+		end)
+		previewCloseBtn.MouseLeave:Connect(function()
+			previewCloseBtn.BackgroundColor3 = CONFIG.Colors.AccentRed
+		end)
+
 		previewCloseBtn.MouseButton1Click:Connect(function()
-			previewWindow:Destroy()
-			moreMenu = nil
+			if moreMenu then
+				moreMenu:Destroy()
+				moreMenu = nil
+			end
 		end)
 
 		-- Preview content scroll
@@ -1064,6 +1079,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		previewScroll.ScrollBarImageColor3 = CONFIG.Colors.Border
 		previewScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 		previewScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		previewScroll.ZIndex = 10001
 		createUICorner(6).Parent = previewScroll
 
 		local previewLayout = Instance.new("UIListLayout")
@@ -1090,6 +1106,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 				propFrame.BackgroundColor3 = CONFIG.Colors.Background
 				propFrame.BorderSizePixel = 0
 				propFrame.LayoutOrder = i
+				propFrame.ZIndex = 10002
 				createUICorner(4).Parent = propFrame
 
 				local propLabel = Instance.new("TextLabel")
@@ -1102,6 +1119,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 				propLabel.TextColor3 = CONFIG.Colors.AccentBlue
 				propLabel.TextSize = 11
 				propLabel.TextXAlignment = Enum.TextXAlignment.Left
+				propLabel.ZIndex = 10003
 
 				local valueLabel = Instance.new("TextLabel")
 				valueLabel.Parent = propFrame
@@ -1114,6 +1132,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 				valueLabel.TextSize = 10
 				valueLabel.TextXAlignment = Enum.TextXAlignment.Left
 				valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+				valueLabel.ZIndex = 10003
 			end
 		end
 
@@ -1125,63 +1144,113 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		actionsFrame.BorderSizePixel = 0
 		actionsFrame.AutomaticSize = Enum.AutomaticSize.Y
 		actionsFrame.LayoutOrder = 1000
+		actionsFrame.ZIndex = 10002
 		createUICorner(4).Parent = actionsFrame
 
-		moreMenu = actionsFrame
-
 		local menuLayout = Instance.new("UIListLayout")
-		menuLayout.Parent = moreMenu
+		menuLayout.Parent = actionsFrame
 		menuLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		menuLayout.Padding = UDim.new(0, 2)
 
 		local menuPadding = Instance.new("UIPadding")
-		menuPadding.Parent = moreMenu
+		menuPadding.Parent = actionsFrame
 		menuPadding.PaddingTop = UDim.new(0, 5)
 		menuPadding.PaddingBottom = UDim.new(0, 5)
 		menuPadding.PaddingLeft = UDim.new(0, 5)
 		menuPadding.PaddingRight = UDim.new(0, 5)
 
 		local menuOptions = {
-			{text = "Copy Path", callback = function()
+			{text = "📋 Copy Path", callback = function()
 				local path = getFullPath(obj)
 				if copyToClipboard(path) then
-					print("Copied to clipboard:", path)
-				else
-					print("Path:", path)
+					createResultsWindow("Copied!", "Path copied to clipboard:\n\n" .. path, screenGui)
 				end
 			end},
-			{text = "Copy Name", callback = function()
+			{text = "📄 Copy Name", callback = function()
 				if copyToClipboard(obj.Name) then
-					print("Copied to clipboard:", obj.Name)
-				else
-					print("Name:", obj.Name)
+					createResultsWindow("Copied!", "Name copied to clipboard:\n\n" .. obj.Name, screenGui)
 				end
 			end},
-			{text = "View Properties", callback = function()
-				print("=== PROPERTIES:", obj:GetFullName(), "===")
-				for _, prop in ipairs({"Name", "ClassName", "Parent", "Visible", "Position", "Size", "BackgroundColor3", "BackgroundTransparency"}) do
+			{text = "🔍 All Properties", callback = function()
+				local results = "<b>ALL PROPERTIES</b>\n\n<b>" .. obj:GetFullName() .. "</b>\n\n"
+				local props = {}
+				for _, prop in ipairs({"Name", "ClassName", "Parent", "Visible", "Position", "Size", "AnchorPoint", "BackgroundColor3", "BackgroundTransparency", "BorderColor3", "BorderSizePixel", "LayoutOrder", "ZIndex", "Rotation", "Transparency", "TextColor3", "TextSize", "Font", "Text", "Image", "ImageColor3"}) do
 					local success, value = pcall(function() return obj[prop] end)
 					if success then
-						print(prop .. ":", formatValue(value))
+						results = results .. string.format('<font color="#5AA3E0">%s:</font> %s\n', prop, formatValue(value))
 					end
 				end
-				print("===========================")
+				createResultsWindow("Object Properties", results, screenGui)
 			end},
-			{text = "Clone Object", callback = function()
+			{text = "👥 Get Children", callback = function()
+				local children = obj:GetChildren()
+				local results = "<b>CHILDREN</b>\n\n<b>" .. obj:GetFullName() .. "</b>\n\n"
+				results = results .. string.format('<b>Total: %d children</b>\n\n', #children)
+				for i, child in ipairs(children) do
+					if i <= 100 then
+						results = results .. string.format('<font color="#5AA3E0">%s</font>: %s\n', child.ClassName, child.Name)
+					end
+				end
+				if #children > 100 then
+					results = results .. string.format('\n... and %d more', #children - 100)
+				end
+				createResultsWindow("Children List", results, screenGui)
+			end},
+			{text = "🌳 Get Descendants", callback = function()
+				local descendants = obj:GetDescendants()
+				local results = "<b>DESCENDANTS</b>\n\n<b>" .. obj:GetFullName() .. "</b>\n\n"
+				results = results .. string.format('<b>Total: %d descendants</b>\n\n', #descendants)
+
+				local byClass = {}
+				for _, desc in ipairs(descendants) do
+					byClass[desc.ClassName] = (byClass[desc.ClassName] or 0) + 1
+				end
+
+				results = results .. '<b>By Type:</b>\n'
+				for className, count in pairs(byClass) do
+					results = results .. string.format('<font color="#50B464">%s:</font> %d\n', className, count)
+				end
+				createResultsWindow("Descendants Tree", results, screenGui)
+			end},
+			{text = "🔗 Find Scripts", callback = function()
+				local scripts = {}
+				for _, desc in ipairs(obj:GetDescendants()) do
+					if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
+						table.insert(scripts, desc)
+					end
+				end
+				local results = "<b>SCRIPTS IN OBJECT</b>\n\n<b>" .. obj:GetFullName() .. "</b>\n\n"
+				results = results .. string.format('<b>Found: %d scripts</b>\n\n', #scripts)
+				for i, script in ipairs(scripts) do
+					if i <= 50 then
+						results = results .. string.format('<font color="#C8B450">%s:</font> %s\n', script.ClassName, script:GetFullName())
+					end
+				end
+				if #scripts > 50 then
+					results = results .. string.format('\n... and %d more', #scripts - 50)
+				end
+				createResultsWindow("Scripts Found", results, screenGui)
+			end},
+			{text = "📦 Clone Object", callback = function()
 				local success, clone = pcall(function()
 					return obj:Clone()
 				end)
-				if success then
-					print("Cloned:", obj.Name, "->", clone:GetFullName())
+				if success and clone then
+					clone.Parent = obj.Parent
+					createResultsWindow("Cloned!", string.format("Successfully cloned:\n\n<b>%s</b>\n\nClone placed in same parent", obj.Name), screenGui)
+					if onRefresh then onRefresh() end
 				else
-					print("Failed to clone:", obj.Name)
+					createResultsWindow("Clone Failed", string.format("Failed to clone:\n\n<b>%s</b>", obj.Name), screenGui)
 				end
 			end},
-			{text = "Destroy Object", callback = function()
-				print("Destroyed:", obj:GetFullName())
+			{text = "🗑️ Destroy Object", callback = function()
+				local name = obj:GetFullName()
 				obj:Destroy()
-				if onRefresh then
-					onRefresh()
+				createResultsWindow("Destroyed", string.format("Object destroyed:\n\n<b>%s</b>", name), screenGui)
+				if onRefresh then onRefresh() end
+				if moreMenu then
+					moreMenu:Destroy()
+					moreMenu = nil
 				end
 			end},
 		}
@@ -1189,17 +1258,18 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 		for i, option in ipairs(menuOptions) do
 			local optionBtn = Instance.new("TextButton")
 			optionBtn.Name = option.text
-			optionBtn.Parent = moreMenu
-			optionBtn.Size = UDim2.new(1, 0, 0, 26)
+			optionBtn.Parent = actionsFrame
+			optionBtn.Size = UDim2.new(1, 0, 0, 30)
 			optionBtn.BackgroundColor3 = CONFIG.Colors.Button
 			optionBtn.BorderSizePixel = 0
 			optionBtn.Font = CONFIG.Font
 			optionBtn.Text = option.text
 			optionBtn.TextColor3 = CONFIG.Colors.Text
-			optionBtn.TextSize = 11
+			optionBtn.TextSize = 12
 			optionBtn.TextXAlignment = Enum.TextXAlignment.Left
 			optionBtn.AutoButtonColor = false
 			optionBtn.LayoutOrder = i
+			optionBtn.ZIndex = 10003
 			createUICorner(3).Parent = optionBtn
 
 			local btnPadding = Instance.new("UIPadding")
@@ -1215,10 +1285,6 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 
 			optionBtn.MouseButton1Click:Connect(function()
 				option.callback()
-				if moreMenu then
-					moreMenu:Destroy()
-					moreMenu = nil
-				end
 			end)
 		end
 	end)
@@ -2083,6 +2149,238 @@ local function populateToolsTab(toolsFrame, screenGui)
 				createResultsWindow("Attributes Dump", results, screenGui)
 			end
 		},
+		{
+			name = "🔍 Find Require() Calls",
+			desc = "Scan all scripts for require() calls to ModuleScripts",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				local results = "<b>REQUIRE() CALLS SCANNER</b>\n\n"
+				local requires = {}
+
+				for _, script in ipairs(game:GetDescendants()) do
+					if script:IsA("LocalScript") or script:IsA("Script") then
+						pcall(function()
+							if getsenv then
+								local env = getsenv(script)
+								if env then
+									results = results .. string.format('<font color="#5AA3E0">%s</font>\n  Environment accessible\n', script:GetFullName())
+								end
+							end
+						end)
+					end
+				end
+
+				results = results .. '\n<b>Note:</b> Full require() scanning requires script source access'
+				createResultsWindow("Require() Scanner", results, screenGui)
+			end
+		},
+		{
+			name = "🎯 Find GetService Calls",
+			desc = "Identify all services being accessed",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				local results = "<b>GETSERVICE() USAGE</b>\n\n"
+				local services = {}
+
+				-- Scan for common service patterns
+				local commonServices = {
+					"Workspace", "Players", "ReplicatedStorage", "ReplicatedFirst",
+					"StarterGui", "StarterPack", "UserInputService", "RunService",
+					"TweenService", "HttpService", "DataStoreService", "MarketplaceService",
+					"TextChatService", "SoundService", "Lighting"
+				}
+
+				results = results .. '<b>Services Available:</b>\n'
+				for _, serviceName in ipairs(commonServices) do
+					local success, service = pcall(function()
+						return game:GetService(serviceName)
+					end)
+					if success then
+						results = results .. string.format('<font color="#50B464">✓</font> %s\n', serviceName)
+					else
+						results = results .. string.format('<font color="#B45050">✗</font> %s\n', serviceName)
+					end
+				end
+
+				createResultsWindow("GetService Scanner", results, screenGui)
+			end
+		},
+		{
+			name = "🧩 Extract Constants",
+			desc = "Find common constants and configuration values",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				local results = "<b>CONSTANTS & CONFIGS</b>\n\n"
+
+				-- Scan StringValues, NumberValues, etc for configs
+				local configs = {}
+				for _, obj in ipairs(game:GetDescendants()) do
+					if obj:IsA("Configuration") then
+						results = results .. string.format('<b><font color="#5AA3E0">%s</font></b>\n', obj:GetFullName())
+						for _, child in ipairs(obj:GetChildren()) do
+							if child:IsA("ValueBase") then
+								local success, val = pcall(function() return child.Value end)
+								if success then
+									results = results .. string.format('  %s = %s\n', child.Name, tostring(val))
+								end
+							end
+						end
+						results = results .. '\n'
+					end
+				end
+
+				createResultsWindow("Constants Extractor", results, screenGui)
+			end
+		},
+		{
+			name = "📡 Network Analyzer",
+			desc = "Analyze RemoteEvents/Functions by parent location",
+			color = CONFIG.Colors.AccentGreen,
+			callback = function()
+				local results = "<b>NETWORK STRUCTURE</b>\n\n"
+				local byParent = {}
+
+				for _, obj in ipairs(game:GetDescendants()) do
+					if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+						local parentPath = obj.Parent and obj.Parent:GetFullName() or "nil"
+						byParent[parentPath] = byParent[parentPath] or {}
+						table.insert(byParent[parentPath], obj)
+					end
+				end
+
+				results = results .. '<b>Remotes by Location:</b>\n\n'
+				for parentPath, remotes in pairs(byParent) do
+					results = results .. string.format('<font color="#5AA3E0">%s</font> (%d)\n', parentPath, #remotes)
+					for i, remote in ipairs(remotes) do
+						if i <= 10 then
+							results = results .. string.format('  • %s: %s\n', remote.ClassName, remote.Name)
+						end
+					end
+					if #remotes > 10 then
+						results = results .. string.format('  ... and %d more\n', #remotes - 10)
+					end
+					results = results .. '\n'
+				end
+
+				createResultsWindow("Network Analyzer", results, screenGui)
+			end
+		},
+		{
+			name = "🎨 UI Theme Extractor",
+			desc = "Extract colors and styling from GUIs",
+			color = CONFIG.Colors.AccentRed,
+			callback = function()
+				local results = "<b>UI THEME EXTRACTION</b>\n\n"
+				local colors = {}
+				local fonts = {}
+
+				for _, obj in ipairs(game:GetDescendants()) do
+					if obj:IsA("GuiObject") then
+						-- Extract colors
+						local success, bgColor = pcall(function() return obj.BackgroundColor3 end)
+						if success and bgColor then
+							local colorKey = string.format("#%02X%02X%02X", bgColor.R * 255, bgColor.G * 255, bgColor.B * 255)
+							colors[colorKey] = (colors[colorKey] or 0) + 1
+						end
+
+						-- Extract fonts
+						local fontSuccess, font = pcall(function() return obj.Font end)
+						if fontSuccess and font then
+							fonts[tostring(font)] = (fonts[tostring(font)] or 0) + 1
+						end
+					end
+				end
+
+				results = results .. '<b>Most Used Colors:</b>\n'
+				local sortedColors = {}
+				for color, count in pairs(colors) do
+					table.insert(sortedColors, {color = color, count = count})
+				end
+				table.sort(sortedColors, function(a, b) return a.count > b.count end)
+
+				for i, data in ipairs(sortedColors) do
+					if i <= 15 then
+						results = results .. string.format('%dx <font color="%s">█████</font> %s\n', data.count, data.color, data.color)
+					end
+				end
+
+				results = results .. '\n<b>Most Used Fonts:</b>\n'
+				for font, count in pairs(fonts) do
+					results = results .. string.format('%dx %s\n', count, font)
+				end
+
+				createResultsWindow("UI Theme", results, screenGui)
+			end
+		},
+		{
+			name = "⚡ Find Connections",
+			desc = "Scan for .Changed, .Touched and other event connections",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				local results = "<b>EVENT CONNECTIONS</b>\n\n"
+
+				if getconnections then
+					results = results .. '<font color="#50B464">✓ getconnections() available</font>\n\n'
+					results = results .. 'Feature: Can inspect connections on any GUI or object\n'
+					results = results .. 'Use the "..." menu on a GUI to view its connections'
+				else
+					results = results .. '<font color="#B45050">✗ getconnections() not available</font>\n\n'
+					results = results .. 'This executor does not support getconnections()\n'
+					results = results .. 'Try using a different executor with this feature'
+				end
+
+				-- Still show some basic info
+				results = results .. '\n<b>Common Events to Monitor:</b>\n'
+				local events = {
+					"MouseButton1Click", "MouseButton2Click",
+					"Changed", "ChildAdded", "DescendantAdded",
+					"Touched", "TouchEnded",
+					"Chatted", "Died", "HealthChanged"
+				}
+				for _, event in ipairs(events) do
+					results = results .. '  • ' .. event .. '\n'
+				end
+
+				createResultsWindow("Connections Info", results, screenGui)
+			end
+		},
+		{
+			name = "📊 Instance Statistics",
+			desc = "Statistical analysis of all instances in game",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				local results = "<b>INSTANCE STATISTICS</b>\n\n"
+				local byClass = {}
+				local total = 0
+
+				for _, obj in ipairs(game:GetDescendants()) do
+					total = total + 1
+					byClass[obj.ClassName] = (byClass[obj.ClassName] or 0) + 1
+				end
+
+				results = results .. string.format('<b>Total Instances: %d</b>\n\n', total)
+
+				local sorted = {}
+				for className, count in pairs(byClass) do
+					table.insert(sorted, {className = className, count = count})
+				end
+				table.sort(sorted, function(a, b) return a.count > b.count end)
+
+				results = results .. '<b>Top Classes:</b>\n'
+				for i, data in ipairs(sorted) do
+					if i <= 30 then
+						local percentage = (data.count / total) * 100
+						results = results .. string.format('%d. <font color="#5AA3E0">%s</font>: %d (%.1f%%)\n', i, data.className, data.count, percentage)
+					end
+				end
+
+				if #sorted > 30 then
+					results = results .. string.format('\n... and %d more classes', #sorted - 30)
+				end
+
+				createResultsWindow("Instance Statistics", results, screenGui)
+			end
+		},
 	}
 
 	for i, tool in ipairs(tools) do
@@ -2613,16 +2911,62 @@ local function initialize()
 	end)
 
 	-- Chat send functionality
+	-- Store chat system type
+	local chatSystemType = "unknown"
+	local TextChatService = game:GetService("TextChatService")
+
+	-- Detect chat system
+	local useTextChatService = false
+	pcall(function()
+		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			useTextChatService = true
+			chatSystemType = "TextChatService"
+		end
+	end)
+
+	if not useTextChatService then
+		local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+		if chatEvents then
+			chatSystemType = "Legacy"
+		end
+	end
+
 	local function sendChatMessage()
 		local message = chatInputBox.Text
 		if message and message ~= "" then
-			local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-			if chatEvents then
-				local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
-				if saymsg then
-					saymsg:FireServer(message, "All")
-					chatInputBox.Text = ""
+			if chatSystemType == "TextChatService" then
+				-- NEW: Use TextChatService
+				pcall(function()
+					-- Find the default chat channel
+					local channels = TextChatService:GetChildren()
+					for _, channel in ipairs(channels) do
+						if channel:IsA("TextChannel") and (channel.Name == "RBXGeneral" or channel.Name == "RBXSystem") then
+							channel:SendAsync(message)
+							chatInputBox.Text = ""
+							return
+						end
+					end
+					-- Fallback: try to send to first available channel
+					if #channels > 0 and channels[1]:IsA("TextChannel") then
+						channels[1]:SendAsync(message)
+						chatInputBox.Text = ""
+					end
+				end)
+			elseif chatSystemType == "Legacy" then
+				-- LEGACY: Use DefaultChatSystemChatEvents
+				local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+				if chatEvents then
+					local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
+					if saymsg then
+						saymsg:FireServer(message, "All")
+						chatInputBox.Text = ""
+					end
 				end
+			else
+				-- Unknown chat system - show error
+				chatInputBox.PlaceholderText = "Chat system not detected!"
+				task.wait(2)
+				chatInputBox.PlaceholderText = "Type message... (Enter to send)"
 			end
 		end
 	end

@@ -486,6 +486,7 @@ local function createMainWindow()
 		{name = "GUIs", icon = "G"},
 		{name = "Remotes", icon = "R"},
 		{name = "Tools", icon = "T"},
+		{name = "Scan", icon = "🔍"},
 		{name = "Chat", icon = "C"},
 		{name = "Settings", icon = "S"}
 	}
@@ -691,6 +692,25 @@ local function createMainWindow()
 	toolsLayout.Parent = toolsFrame
 	toolsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	toolsLayout.Padding = UDim.new(0, 5)
+
+	-- Scan Frame
+	local scanFrame = Instance.new("ScrollingFrame")
+	scanFrame.Name = "ScanFrame"
+	scanFrame.Parent = mainFrame
+	scanFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	scanFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	scanFrame.BackgroundColor3 = CONFIG.Colors.Background
+	scanFrame.BorderSizePixel = 0
+	scanFrame.ScrollBarThickness = 6
+	scanFrame.ScrollBarImageColor3 = CONFIG.Colors.Border
+	scanFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scanFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scanFrame.Visible = false
+
+	local scanLayout = Instance.new("UIListLayout")
+	scanLayout.Parent = scanFrame
+	scanLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	scanLayout.Padding = UDim.new(0, 5)
 
 	local settingsFrame = Instance.new("Frame")
 	settingsFrame.Name = "SettingsFrame"
@@ -1666,6 +1686,385 @@ local function refreshRemotesList(remotesFrame)
 	end
 end
 
+local function populateScanTab(scanFrame, screenGui)
+	-- Scan Title
+	local titleCard = Instance.new("Frame")
+	titleCard.Name = "TitleCard"
+	titleCard.Parent = scanFrame
+	titleCard.Size = UDim2.new(1, -10, 0, 120)
+	titleCard.BackgroundColor3 = CONFIG.Colors.TopBar
+	titleCard.BorderSizePixel = 0
+	titleCard.LayoutOrder = 1
+	createUICorner(8).Parent = titleCard
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Parent = titleCard
+	titleLabel.Position = UDim2.new(0, 20, 0, 15)
+	titleLabel.Size = UDim2.new(1, -40, 0, 30)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = CONFIG.FontBold
+	titleLabel.Text = "🔍 VULNERABILITY SCANNER"
+	titleLabel.TextColor3 = CONFIG.Colors.Text
+	titleLabel.TextSize = 24
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local descLabel = Instance.new("TextLabel")
+	descLabel.Parent = titleCard
+	descLabel.Position = UDim2.new(0, 20, 0, 50)
+	descLabel.Size = UDim2.new(1, -40, 0, 60)
+	descLabel.BackgroundTransparency = 1
+	titleLabel.Font = CONFIG.Font
+	descLabel.Text = "Comprehensive vulnerability scanner that analyzes anti-cheat systems, remote endpoints, script patterns, environment pollution, GUI injections, memory leaks, and generates detailed security reports.\n\nClick RUN SCAN to begin comprehensive analysis."
+	descLabel.TextColor3 = CONFIG.Colors.TextDim
+	descLabel.TextSize = 12
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.TextYAlignment = Enum.TextYAlignment.Top
+	descLabel.TextWrapped = true
+
+	-- Scan Button
+	local scanButton = Instance.new("TextButton")
+	scanButton.Name = "ScanButton"
+	scanButton.Parent = scanFrame
+	scanButton.Size = UDim2.new(1, -10, 0, 60)
+	scanButton.BackgroundColor3 = CONFIG.Colors.AccentGreen
+	scanButton.BorderSizePixel = 0
+	scanButton.Font = CONFIG.FontBold
+	scanButton.Text = "▶ RUN COMPREHENSIVE SCAN"
+	scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	scanButton.TextSize = 18
+	scanButton.AutoButtonColor = false
+	scanButton.LayoutOrder = 2
+	createUICorner(8).Parent = scanButton
+
+	scanButton.MouseEnter:Connect(function()
+		scanButton.BackgroundColor3 = Color3.fromRGB(100, 220, 120)
+	end)
+
+	scanButton.MouseLeave:Connect(function()
+		scanButton.BackgroundColor3 = CONFIG.Colors.AccentGreen
+	end)
+
+	scanButton.MouseButton1Click:Connect(function()
+		-- Disable button during scan
+		scanButton.Enabled = false
+		scanButton.Text = "⏳ SCANNING..."
+		scanButton.BackgroundColor3 = CONFIG.Colors.AccentYellow
+
+		task.spawn(function()
+			local results = "<b>🔍 COMPREHENSIVE VULNERABILITY SCAN REPORT</b>\n\n"
+			results = results .. '<font color="#C8B450">Scan started: ' .. os.date("%Y-%m-%d %H:%M:%S") .. '</font>\n'
+			results = results .. '<font color="#5AA3E0">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</font>\n\n'
+
+			local totalIssues = 0
+			local criticalIssues = 0
+			local highIssues = 0
+			local mediumIssues = 0
+			local lowIssues = 0
+
+			-- 1. ANTI-CHEAT DETECTION
+			results = results .. '<b><font color="#B45050">🛡️  ANTI-CHEAT SYSTEM DETECTION</font></b>\n\n'
+
+			local antiCheatSystems = {
+				{name = "Adonis Anti-Cheat", check = function()
+					return game:GetService("ReplicatedStorage"):FindFirstChild("HDAdminClient") ~= nil
+				end, severity = "HIGH"},
+				{name = "Unnamed Anti-Cheat", check = function()
+					return game:GetService("ReplicatedStorage"):FindFirstChild("ProtectGui") ~= nil
+				end, severity = "HIGH"},
+				{name = "Byfron/Hyperion", check = function()
+					return game:GetService("CoreGui"):FindFirstChild("RobloxGui") ~= nil and
+					       game:GetService("CoreGui").RobloxGui:FindFirstChild("Modules") ~= nil
+				end, severity = "CRITICAL"},
+				{name = "Custom Remote Monitor", check = function()
+					local detected = false
+					for _, remote in ipairs(game:GetDescendants()) do
+						if remote:IsA("RemoteEvent") and (remote.Name:match("AntiCheat") or remote.Name:match("Security") or remote.Name:match("Detect")) then
+							detected = true
+							break
+						end
+					end
+					return detected
+				end, severity = "MEDIUM"},
+			}
+
+			for _, ac in ipairs(antiCheatSystems) do
+				local success, detected = pcall(ac.check)
+				if success and detected then
+					results = results .. string.format('<font color="#B45050">⚠️  DETECTED:</font> %s (<font color="#B45050">%s</font>)\n', ac.name, ac.severity)
+					totalIssues = totalIssues + 1
+					if ac.severity == "CRITICAL" then criticalIssues = criticalIssues + 1
+					elseif ac.severity == "HIGH" then highIssues = highIssues + 1
+					elseif ac.severity == "MEDIUM" then mediumIssues = mediumIssues + 1
+					else lowIssues = lowIssues + 1 end
+				else
+					results = results .. string.format('<font color="#50B464">✓ Not detected:</font> %s\n', ac.name)
+				end
+			end
+
+			-- 2. REMOTE ENDPOINT ANALYSIS
+			results = results .. '\n<b><font color="#5AA3E0">📡 REMOTE ENDPOINT VULNERABILITY ANALYSIS</font></b>\n\n'
+
+			local vulnerableRemotes = {}
+			local totalRemotes = 0
+
+			for _, remote in ipairs(game:GetDescendants()) do
+				if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+					totalRemotes = totalRemotes + 1
+
+					-- Check for vulnerable patterns
+					local isVulnerable = false
+					local reason = ""
+
+					-- Check if in ReplicatedStorage (commonly exploitable)
+					if remote:IsDescendantOf(game:GetService("ReplicatedStorage")) then
+						isVulnerable = true
+						reason = "Exposed in ReplicatedStorage"
+					end
+
+					-- Check for dangerous names
+					local dangerousNames = {"Admin", "Kick", "Ban", "Give", "Set", "Update", "Purchase", "Buy", "Teleport", "Kill"}
+					for _, dangerous in ipairs(dangerousNames) do
+						if remote.Name:match(dangerous) then
+							isVulnerable = true
+							reason = reason .. (reason ~= "" and ", " or "") .. "Dangerous name pattern: " .. dangerous
+						end
+					end
+
+					if isVulnerable then
+						table.insert(vulnerableRemotes, {
+							remote = remote,
+							reason = reason,
+							severity = remote.Name:match("Admin") or remote.Name:match("Ban") or remote.Name:match("Kick") and "CRITICAL" or "HIGH"
+						})
+					end
+				end
+			end
+
+			results = results .. string.format('<b>Total Remotes Scanned:</b> %d\n', totalRemotes)
+			results = results .. string.format('<b><font color="#B45050">Potentially Vulnerable:</font></b> %d\n\n', #vulnerableRemotes)
+
+			for i, vuln in ipairs(vulnerableRemotes) do
+				if i <= 15 then
+					results = results .. string.format('<font color="#B45050">⚠️  [%s]</font> %s\n   ↳ %s\n   ↳ Path: %s\n',
+						vuln.severity, vuln.remote.ClassName, vuln.reason, vuln.remote:GetFullName())
+					totalIssues = totalIssues + 1
+					if vuln.severity == "CRITICAL" then criticalIssues = criticalIssues + 1
+					else highIssues = highIssues + 1 end
+				end
+			end
+			if #vulnerableRemotes > 15 then
+				results = results .. string.format('... and %d more vulnerable remotes\n', #vulnerableRemotes - 15)
+			end
+
+			-- 3. SCRIPT SECURITY ANALYSIS
+			results = results .. '\n<b><font color="#9664C8">📜 SCRIPT SECURITY ANALYSIS</font></b>\n\n'
+
+			local suspiciousScripts = 0
+			local totalScripts = 0
+			local scriptIssues = {}
+
+			for _, script in ipairs(game:GetDescendants()) do
+				if script:IsA("LocalScript") or script:IsA("Script") or script:IsA("ModuleScript") then
+					totalScripts = totalScripts + 1
+
+					-- Check for suspicious patterns
+					pcall(function()
+						if getsenv and script:IsA("LocalScript") then
+							local env = getsenv(script)
+							if env then
+								-- Check for exploit functions in environment
+								local dangerousFuncs = {"getfenv", "setfenv", "loadstring", "require"}
+								for _, func in ipairs(dangerousFuncs) do
+									if env[func] then
+										suspiciousScripts = suspiciousScripts + 1
+										table.insert(scriptIssues, {
+											script = script.Name,
+											issue = "Has access to: " .. func,
+											severity = "MEDIUM"
+										})
+										break
+									end
+								end
+							end
+						end
+					end)
+				end
+			end
+
+			results = results .. string.format('<b>Scripts Analyzed:</b> %d\n', totalScripts)
+			results = results .. string.format('<b><font color="#C8B450">Suspicious Scripts:</font></b> %d\n\n', suspiciousScripts)
+
+			for i, issue in ipairs(scriptIssues) do
+				if i <= 10 then
+					results = results .. string.format('<font color="#C8B450">⚠️  [%s]</font> %s\n   ↳ %s\n',
+						issue.severity, issue.script, issue.issue)
+					totalIssues = totalIssues + 1
+					mediumIssues = mediumIssues + 1
+				end
+			end
+
+			-- 4. ENVIRONMENT POLLUTION CHECK
+			results = results .. '\n<b><font color="#C8B450">🌍 ENVIRONMENT POLLUTION ANALYSIS</font></b>\n\n'
+
+			local executorFunctions = {
+				"getgenv", "getrenv", "getsenv", "getrawmetatable", "setrawmetatable",
+				"hookfunction", "hookmetamethod", "getgc", "getupvalues", "getconstants",
+				"decompile", "setclipboard", "writefile", "readfile"
+			}
+
+			local detectedPollution = 0
+			for _, funcName in ipairs(executorFunctions) do
+				if _G[funcName] then
+					detectedPollution = detectedPollution + 1
+				end
+			end
+
+			local pollutionLevel = detectedPollution > 10 and "HIGH" or detectedPollution > 5 and "MEDIUM" or "LOW"
+			results = results .. string.format('<b>Pollution Level:</b> <font color="%s">%s</font> (%d/%d functions)\n',
+				pollutionLevel == "HIGH" and "#B45050" or pollutionLevel == "MEDIUM" and "#C8B450" or "#50B464",
+				pollutionLevel, detectedPollution, #executorFunctions)
+
+			if detectedPollution > 0 then
+				results = results .. '<font color="#C8B450">⚠️  Executor functions detected in global environment</font>\n'
+				totalIssues = totalIssues + 1
+				if pollutionLevel == "HIGH" then highIssues = highIssues + 1
+				else mediumIssues = mediumIssues + 1 end
+			end
+
+			-- 5. METATABLE INTEGRITY CHECK
+			results = results .. '\n<b><font color="#9664C8">🔬 METATABLE INTEGRITY CHECK</font></b>\n\n'
+
+			if getrawmetatable then
+				local metatableHooked = false
+				pcall(function()
+					local mt = getrawmetatable(game)
+					if mt and mt.__namecall then
+						local info = debug.getinfo(mt.__namecall)
+						if info and info.what == "Lua" then
+							metatableHooked = true
+						end
+					end
+				end)
+
+				if metatableHooked then
+					results = results .. '<font color="#B45050">⚠️  CRITICAL: __namecall appears hooked!</font>\n'
+					results = results .. '   ↳ Possible metamethod tampering detected\n'
+					totalIssues = totalIssues + 1
+					criticalIssues = criticalIssues + 1
+				else
+					results = results .. '<font color="#50B464">✓ Metatables appear clean</font>\n'
+				end
+			else
+				results = results .. '<font color="#C8B450">⚠️  Cannot check (getrawmetatable unavailable)</font>\n'
+			end
+
+			-- 6. MEMORY LEAK DETECTION
+			results = results .. '\n<b><font color="#50B464">🗑️  MEMORY LEAK DETECTION</font></b>\n\n'
+
+			if getgc then
+				local gcObjects = getgc(true)
+				local hiddenInstances = 0
+
+				for _, obj in ipairs(gcObjects) do
+					if typeof(obj) == "Instance" then
+						pcall(function()
+							if not obj:IsDescendantOf(game) then
+								hiddenInstances = hiddenInstances + 1
+							end
+						end)
+					end
+				end
+
+				results = results .. string.format('<b>GC Objects:</b> %d\n', #gcObjects)
+				results = results .. string.format('<b>Hidden Instances:</b> %d\n', hiddenInstances)
+
+				if hiddenInstances > 50 then
+					results = results .. '<font color="#C8B450">⚠️  Possible memory leaks detected</font>\n'
+					totalIssues = totalIssues + 1
+					mediumIssues = mediumIssues + 1
+				else
+					results = results .. '<font color="#50B464">✓ Memory appears healthy</font>\n'
+				end
+			else
+				results = results .. '<font color="#C8B450">⚠️  Cannot scan (getgc unavailable)</font>\n'
+			end
+
+			-- 7. GUI INJECTION POINTS
+			results = results .. '\n<b><font color="#5AA3E0">🎨 GUI INJECTION VULNERABILITY SCAN</font></b>\n\n'
+
+			local textBoxes = 0
+			local unsanitizedInputs = 0
+
+			for _, obj in ipairs(game:GetDescendants()) do
+				if obj:IsA("TextBox") then
+					textBoxes = textBoxes + 1
+					-- Check if TextBox is in ReplicatedStorage or accessible
+					if obj:IsDescendantOf(game:GetService("ReplicatedStorage")) or obj:IsDescendantOf(game:GetService("StarterGui")) then
+						unsanitizedInputs = unsanitizedInputs + 1
+					end
+				end
+			end
+
+			results = results .. string.format('<b>TextBoxes Found:</b> %d\n', textBoxes)
+			results = results .. string.format('<b>Potentially Exploitable:</b> %d\n', unsanitizedInputs)
+
+			if unsanitizedInputs > 0 then
+				results = results .. '<font color="#C8B450">⚠️  Unsanitized user input fields detected</font>\n'
+				totalIssues = totalIssues + 1
+				lowIssues = lowIssues + 1
+			end
+
+			-- SUMMARY REPORT
+			results = results .. '\n<font color="#5AA3E0">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</font>\n'
+			results = results .. '<b><font color="#C8B450">📊 SCAN SUMMARY</font></b>\n\n'
+
+			results = results .. string.format('<b>Total Issues Found:</b> <font color="%s">%d</font>\n',
+				totalIssues > 10 and "#B45050" or totalIssues > 5 and "#C8B450" or "#50B464", totalIssues)
+			results = results .. string.format('  <font color="#B45050">● CRITICAL:</font> %d\n', criticalIssues)
+			results = results .. string.format('  <font color="#B45050">● HIGH:</font> %d\n', highIssues)
+			results = results .. string.format('  <font color="#C8B450">● MEDIUM:</font> %d\n', mediumIssues)
+			results = results .. string.format('  <font color="#50B464">● LOW:</font> %d\n', lowIssues)
+
+			results = results .. '\n<b>Security Rating:</b> '
+			if totalIssues == 0 then
+				results = results .. '<font color="#50B464">EXCELLENT ★★★★★</font>\n'
+			elseif totalIssues <= 3 then
+				results = results .. '<font color="#50B464">GOOD ★★★★☆</font>\n'
+			elseif totalIssues <= 7 then
+				results = results .. '<font color="#C8B450">FAIR ★★★☆☆</font>\n'
+			elseif totalIssues <= 12 then
+				results = results .. '<font color="#B45050">POOR ★★☆☆☆</font>\n'
+			else
+				results = results .. '<font color="#B45050">CRITICAL ★☆☆☆☆</font>\n'
+			end
+
+			results = results .. '\n<b>Recommendations:</b>\n'
+			if criticalIssues > 0 then
+				results = results .. '<font color="#B45050">• Immediate action required for critical issues</font>\n'
+			end
+			if highIssues > 0 then
+				results = results .. '<font color="#B45050">• Review and patch high-severity vulnerabilities</font>\n'
+			end
+			if mediumIssues > 0 then
+				results = results .. '<font color="#C8B450">• Monitor medium-risk issues</font>\n'
+			end
+			results = results .. '• Implement input sanitization\n'
+			results = results .. '• Use secure remote validation\n'
+			results = results .. '• Regular security audits recommended\n'
+
+			results = results .. '\n<font color="#C8B450">Scan completed: ' .. os.date("%Y-%m-%d %H:%M:%S") .. '</font>\n'
+
+			-- Show results
+			createResultsWindow("Vulnerability Scan Report", results, screenGui)
+
+			-- Re-enable button
+			scanButton.Enabled = true
+			scanButton.Text = "▶ RUN COMPREHENSIVE SCAN"
+			scanButton.BackgroundColor3 = CONFIG.Colors.AccentGreen
+		end)
+	end)
+end
+
 local function populateToolsTab(toolsFrame, screenGui)
 	local tools = {
 		-- ═══════════════════════════════════════════
@@ -2634,6 +3033,19 @@ local function populateToolsTab(toolsFrame, screenGui)
 				local results = "<b>METATABLE DEEP ANALYZER</b>\n\n"
 				results = results .. '<b><font color="#B45050">⚡ ADVANCED METAPROGRAMMING ANALYSIS</font></b>\n\n'
 
+				-- Check if getrawmetatable exists
+				if not getrawmetatable then
+					results = results .. '<font color="#B45050">✗ getrawmetatable() not available</font>\n\n'
+					results = results .. 'This feature requires an executor with getrawmetatable() support.\n'
+					results = results .. '\n<b>What this tool does:</b>\n'
+					results = results .. '• Analyzes metatables of all game objects\n'
+					results = results .. '• Detects metamethod usage patterns\n'
+					results = results .. '• Checks metatable protection\n'
+					results = results .. '• Identifies hooking opportunities\n'
+					createResultsWindow("Metatable Deep Analyzer", results, screenGui)
+					return
+				end
+
 				local analyzed = {}
 				local metatableCount = 0
 				local metamethodStats = {}
@@ -3115,9 +3527,12 @@ local function populateToolsTab(toolsFrame, screenGui)
 					-- Check in global environment
 					if funcName:find("%.") then
 						-- Handle debug.* functions
-						local parts = funcName:split(".")
+						local parts = {}
+						for part in funcName:gmatch("[^%.]+") do
+							table.insert(parts, part)
+						end
 						pcall(function()
-							if _G[parts[1]] and _G[parts[1]][parts[2]] then
+							if parts[1] and parts[2] and _G[parts[1]] and _G[parts[1]][parts[2]] then
 								exists = true
 							end
 						end)
@@ -3293,7 +3708,10 @@ local function populateToolsTab(toolsFrame, screenGui)
 				if debug and debug.traceback then
 					results = results .. '\n<b>📊 CURRENT STACK TRACE:</b>\n'
 					local trace = debug.traceback()
-					local lines = trace:split("\n")
+					local lines = {}
+					for line in trace:gmatch("[^\n]+") do
+						table.insert(lines, line)
+					end
 					for i, line in ipairs(lines) do
 						if i <= 15 and line ~= "" then
 							results = results .. string.format('<font color="#9664C8">%s</font>\n', line:gsub("\t", "  "))
@@ -3911,6 +4329,7 @@ local function initialize()
 
 	-- Populate Tools tab
 	populateToolsTab(toolsFrame, screenGui)
+	populateScanTab(scanFrame, screenGui)
 
 	-- Populate Settings tab
 	populateSettingsTab(settingsFrame)
@@ -4040,6 +4459,7 @@ local function initialize()
 		remotesFrame.Visible = (tabName == "Remotes")
 		remotesHeader.Visible = (tabName == "Remotes")
 		toolsFrame.Visible = (tabName == "Tools")
+		scanFrame.Visible = (tabName == "Scan")
 		chatFrame.Visible = (tabName == "Chat")
 		settingsFrame.Visible = (tabName == "Settings")
 

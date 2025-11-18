@@ -1,6 +1,14 @@
 -- Roblox GUI Debug Tool
 -- Professional GUI Inspector & Debugger
 -- No lag, no auto-refresh, manual control only
+--
+-- USAGE:
+-- _G.ShowDebugTool()   - Show the debug window
+-- _G.HideDebugTool()   - Hide the debug window
+-- _G.ToggleDebugTool() - Toggle window visibility
+--
+-- Press the "X" button to hide (not destroy) the window
+-- Use the global functions above to show it again
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -160,7 +168,7 @@ local function createMainWindow()
 	local btnSize = 30
 	local btnPadding = 5
 
-	-- Refresh Button (⟳)
+	-- Refresh Button
 	local refreshBtn = Instance.new("TextButton")
 	refreshBtn.Name = "RefreshButton"
 	refreshBtn.Parent = topBar
@@ -169,9 +177,9 @@ local function createMainWindow()
 	refreshBtn.BackgroundColor3 = CONFIG.Colors.Button
 	refreshBtn.BorderSizePixel = 0
 	refreshBtn.Font = CONFIG.FontBold
-	refreshBtn.Text = "⟳"
+	refreshBtn.Text = "R"
 	refreshBtn.TextColor3 = CONFIG.Colors.AccentGreen
-	refreshBtn.TextSize = 18
+	refreshBtn.TextSize = 16
 	refreshBtn.AutoButtonColor = false
 	createUICorner(4).Parent = refreshBtn
 
@@ -321,25 +329,44 @@ end
 -- ========================
 
 local function attachGuiObject(obj)
+	print("=== ATTACH DEBUG START ===")
+	print("Attaching:", obj:GetFullName())
+
+	-- First, make the object itself visible
 	if isGuiRoot(obj) then
 		obj.Enabled = true
-	end
-
-	if obj:IsA("GuiObject") then
+		print("✓ Enabled GuiRoot:", obj.Name)
+	elseif obj:IsA("GuiObject") then
 		obj.Visible = true
+		print("✓ Made visible:", obj.Name)
 	end
 
-	-- Also enable parent chain if needed
+	-- Then enable entire parent chain
 	local parent = obj.Parent
-	while parent do
+	local depth = 0
+	while parent and depth < 20 do  -- Safety limit
 		if isGuiRoot(parent) then
 			parent.Enabled = true
+			print("✓ Enabled parent GuiRoot:", parent.Name)
 			break
 		elseif parent:IsA("GuiObject") then
 			parent.Visible = true
+			print("✓ Made parent visible:", parent.Name)
 		end
 		parent = parent.Parent
+		depth = depth + 1
 	end
+
+	-- Also make all descendants visible for complete visibility
+	for _, descendant in ipairs(obj:GetDescendants()) do
+		if descendant:IsA("GuiObject") then
+			descendant.Visible = true
+		elseif isGuiRoot(descendant) then
+			descendant.Enabled = true
+		end
+	end
+
+	print("=== ATTACH DEBUG END ===")
 end
 
 local function hideGuiObject(obj)
@@ -366,12 +393,27 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 	local entryHeight = 32
 	local indentSize = depth * 20
 
+	-- Create wrapper to hold both entry and its children
+	local wrapper = Instance.new("Frame")
+	wrapper.Name = "Wrapper_" .. obj.Name
+	wrapper.Parent = parent
+	wrapper.Size = UDim2.new(1, -10, 0, entryHeight)
+	wrapper.BackgroundTransparency = 1
+	wrapper.BorderSizePixel = 0
+	wrapper.AutomaticSize = Enum.AutomaticSize.Y
+
+	local wrapperLayout = Instance.new("UIListLayout")
+	wrapperLayout.Parent = wrapper
+	wrapperLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	wrapperLayout.Padding = UDim.new(0, 2)
+
 	local entry = Instance.new("Frame")
 	entry.Name = "Entry_" .. obj.Name
-	entry.Parent = parent
-	entry.Size = UDim2.new(1, -10, 0, entryHeight)
+	entry.Parent = wrapper
+	entry.Size = UDim2.new(1, 0, 0, entryHeight)
 	entry.BackgroundColor3 = depth == 0 and CONFIG.Colors.TopBar or CONFIG.Colors.Button
 	entry.BorderSizePixel = 0
+	entry.LayoutOrder = 1
 
 	createUICorner(4).Parent = entry
 
@@ -448,6 +490,16 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 
 	attachBtn.MouseButton1Click:Connect(function()
 		attachGuiObject(obj)
+
+		-- Visual feedback
+		local originalColor = attachBtn.BackgroundColor3
+		local originalText = attachBtn.Text
+		attachBtn.BackgroundColor3 = Color3.fromRGB(80, 220, 100)
+		attachBtn.Text = "DONE!"
+
+		task.wait(0.5)
+		attachBtn.BackgroundColor3 = originalColor
+		attachBtn.Text = originalText
 	end)
 
 	-- HIDE Button
@@ -495,15 +547,15 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 				State.expanded[obj] = true
 				expandBtn.Text = "−"
 
-				-- Create child container
+				-- Create child container directly under this entry in wrapper
 				childContainer = Instance.new("Frame")
 				childContainer.Name = "ChildContainer"
-				childContainer.Parent = parent
-				childContainer.Size = UDim2.new(1, -10, 0, 0)
+				childContainer.Parent = wrapper
+				childContainer.Size = UDim2.new(1, 0, 0, 0)
 				childContainer.BackgroundTransparency = 1
 				childContainer.BorderSizePixel = 0
 				childContainer.AutomaticSize = Enum.AutomaticSize.Y
-				childContainer.LayoutOrder = entry.LayoutOrder + 1
+				childContainer.LayoutOrder = 2
 
 				local childLayout = Instance.new("UIListLayout")
 				childLayout.Parent = childContainer
@@ -511,16 +563,17 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 				childLayout.Padding = UDim.new(0, 2)
 
 				-- Add children (only 1 level deep)
-				for _, child in ipairs(obj:GetChildren()) do
+				for i, child in ipairs(obj:GetChildren()) do
 					if child:IsA("GuiObject") or isGuiRoot(child) then
-						createGuiEntry(childContainer, child, depth + 1, onRefresh)
+						local childEntry = createGuiEntry(childContainer, child, depth + 1, onRefresh)
+						childEntry.LayoutOrder = i
 					end
 				end
 			end
 		end)
 	end
 
-	return entry
+	return wrapper
 end
 
 local function scanAndDisplayGuis(contentFrame, statusLabel)
@@ -579,19 +632,64 @@ local function scanAndDisplayGuis(contentFrame, statusLabel)
 end
 
 -- ========================
+-- SHOW/HIDE FUNCTIONALITY
+-- ========================
+
+local debugToolInstance = nil
+
+_G.ShowDebugTool = function()
+	if debugToolInstance then
+		debugToolInstance.Enabled = true
+
+		-- Make all GuiObjects visible
+		for _, v in ipairs(debugToolInstance:GetDescendants()) do
+			if v:IsA("GuiObject") then
+				v.Visible = true
+			end
+		end
+
+		print("🟢 GUI Debug Tool Shown")
+	else
+		print("⚠ Debug Tool not initialized yet")
+	end
+end
+
+_G.HideDebugTool = function()
+	if debugToolInstance then
+		debugToolInstance.Enabled = false
+		print("🙈 GUI Debug Tool Hidden")
+	else
+		print("⚠ Debug Tool not initialized yet")
+	end
+end
+
+_G.ToggleDebugTool = function()
+	if debugToolInstance then
+		if debugToolInstance.Enabled then
+			_G.HideDebugTool()
+		else
+			_G.ShowDebugTool()
+		end
+	end
+end
+
+-- ========================
 -- INITIALIZE
 -- ========================
 
 local function initialize()
 	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel = createMainWindow()
 
+	-- Store reference for show/hide functions
+	debugToolInstance = screenGui
+
 	-- Make draggable
 	local topBar = mainFrame:FindFirstChild("TopBar")
 	makeDraggable(mainFrame, topBar)
 
-	-- Close button
+	-- Close button (hides instead of destroying)
 	closeBtn.MouseButton1Click:Connect(function()
-		screenGui:Destroy()
+		_G.HideDebugTool()
 	end)
 
 	-- Minimize button

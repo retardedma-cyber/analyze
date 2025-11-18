@@ -19,7 +19,8 @@ local LocalPlayer = Players.LocalPlayer
 -- CONFIGURATION
 -- ========================
 local CONFIG = {
-	WindowSize = Vector2.new(500, 550),
+	WindowSize = Vector2.new(750, 600),
+	SidebarWidth = 120,
 	Colors = {
 		Background = Color3.fromRGB(25, 25, 28),
 		TopBar = Color3.fromRGB(35, 35, 40),
@@ -32,6 +33,8 @@ local CONFIG = {
 		AccentBlue = Color3.fromRGB(70, 130, 180),
 		AccentGreen = Color3.fromRGB(80, 180, 100),
 		AccentRed = Color3.fromRGB(180, 80, 80),
+		AccentYellow = Color3.fromRGB(200, 180, 80),
+		AccentPurple = Color3.fromRGB(150, 100, 200),
 	},
 	Font = Enum.Font.Gotham,
 	FontBold = Enum.Font.GothamBold,
@@ -47,6 +50,10 @@ local State = {
 	hiddenGuis = {}, -- {[instance] = true}
 	frozenIndividual = {}, -- {[instance] = {children snapshot}}
 	searchQuery = "", -- Current search filter
+	currentTab = "GUIs", -- Active tab: "GUIs", "Remotes", "Tools", "Settings"
+	remoteLogs = {}, -- {timestamp, remote, args, type}
+	remoteSpyEnabled = false,
+	highlightedObject = nil,
 }
 
 -- ========================
@@ -55,6 +62,53 @@ local State = {
 
 local function isGuiRoot(obj)
 	return obj:IsA("ScreenGui") or obj:IsA("SurfaceGui") or obj:IsA("BillboardGui")
+end
+
+local function copyToClipboard(text)
+	if setclipboard then
+		setclipboard(text)
+		return true
+	elseif syn and syn.write_clipboard then
+		syn.write_clipboard(text)
+		return true
+	elseif Clipboard and Clipboard.set then
+		Clipboard.set(text)
+		return true
+	end
+	return false
+end
+
+local function getFullPath(obj)
+	local path = obj.Name
+	local parent = obj.Parent
+	while parent and parent ~= game do
+		path = parent.Name .. "." .. path
+		parent = parent.Parent
+	end
+	return "game." .. path
+end
+
+local function formatValue(value)
+	local valueType = typeof(value)
+	if valueType == "string" then
+		return '"' .. value .. '"'
+	elseif valueType == "number" then
+		return tostring(value)
+	elseif valueType == "boolean" then
+		return tostring(value)
+	elseif valueType == "Instance" then
+		return value:GetFullName()
+	elseif valueType == "Vector3" then
+		return string.format("Vector3.new(%.2f, %.2f, %.2f)", value.X, value.Y, value.Z)
+	elseif valueType == "Vector2" then
+		return string.format("Vector2.new(%.2f, %.2f)", value.X, value.Y)
+	elseif valueType == "Color3" then
+		return string.format("Color3.fromRGB(%d, %d, %d)", value.R * 255, value.G * 255, value.B * 255)
+	elseif valueType == "UDim2" then
+		return string.format("UDim2.new(%.3f, %d, %.3f, %d)", value.X.Scale, value.X.Offset, value.Y.Scale, value.Y.Offset)
+	else
+		return tostring(value)
+	end
 end
 
 local function getSourceTag(obj)
@@ -234,12 +288,57 @@ local function createMainWindow()
 	separator.BackgroundColor3 = CONFIG.Colors.Border
 	separator.BorderSizePixel = 0
 
+	-- Sidebar (Left navigation)
+	local sidebar = Instance.new("Frame")
+	sidebar.Name = "Sidebar"
+	sidebar.Parent = mainFrame
+	sidebar.Position = UDim2.new(0, 0, 0, 36)
+	sidebar.Size = UDim2.new(0, CONFIG.SidebarWidth, 1, -36)
+	sidebar.BackgroundColor3 = CONFIG.Colors.TopBar
+	sidebar.BorderSizePixel = 0
+
+	-- Vertical separator for sidebar
+	local sidebarSeparator = Instance.new("Frame")
+	sidebarSeparator.Name = "SidebarSeparator"
+	sidebarSeparator.Parent = mainFrame
+	sidebarSeparator.Position = UDim2.new(0, CONFIG.SidebarWidth, 0, 36)
+	sidebarSeparator.Size = UDim2.new(0, 1, 1, -36)
+	sidebarSeparator.BackgroundColor3 = CONFIG.Colors.Border
+	sidebarSeparator.BorderSizePixel = 0
+
+	-- Sidebar buttons
+	local tabButtons = {}
+	local tabs = {
+		{name = "GUIs", icon = "G"},
+		{name = "Remotes", icon = "R"},
+		{name = "Tools", icon = "T"},
+		{name = "Settings", icon = "S"}
+	}
+
+	for i, tab in ipairs(tabs) do
+		local btn = Instance.new("TextButton")
+		btn.Name = tab.name .. "Tab"
+		btn.Parent = sidebar
+		btn.Position = UDim2.new(0, 10, 0, 10 + (i - 1) * 50)
+		btn.Size = UDim2.new(1, -20, 0, 40)
+		btn.BackgroundColor3 = State.currentTab == tab.name and CONFIG.Colors.ButtonActive or CONFIG.Colors.Button
+		btn.BorderSizePixel = 0
+		btn.Font = CONFIG.FontBold
+		btn.Text = tab.name
+		btn.TextColor3 = CONFIG.Colors.Text
+		btn.TextSize = 13
+		btn.AutoButtonColor = false
+		createUICorner(4).Parent = btn
+
+		tabButtons[tab.name] = btn
+	end
+
 	-- Toolbar (Freeze toggle + Search)
 	local toolbar = Instance.new("Frame")
 	toolbar.Name = "Toolbar"
 	toolbar.Parent = mainFrame
-	toolbar.Position = UDim2.new(0, 0, 0, 36)
-	toolbar.Size = UDim2.new(1, 0, 0, 70)
+	toolbar.Position = UDim2.new(0, CONFIG.SidebarWidth + 1, 0, 36)
+	toolbar.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 1), 0, 70)
 	toolbar.BackgroundColor3 = CONFIG.Colors.Background
 	toolbar.BorderSizePixel = 0
 
@@ -319,8 +418,8 @@ local function createMainWindow()
 	local contentFrame = Instance.new("ScrollingFrame")
 	contentFrame.Name = "ContentFrame"
 	contentFrame.Parent = mainFrame
-	contentFrame.Position = UDim2.new(0, 10, 0, 116)
-	contentFrame.Size = UDim2.new(1, -20, 1, -126)
+	contentFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 116)
+	contentFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -126)
 	contentFrame.BackgroundColor3 = CONFIG.Colors.Background
 	contentFrame.BorderSizePixel = 0
 	contentFrame.ScrollBarThickness = 6
@@ -333,7 +432,53 @@ local function createMainWindow()
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	listLayout.Padding = UDim.new(0, 2)
 
-	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn
+	-- Content frames for each tab
+	local remotesFrame = Instance.new("ScrollingFrame")
+	remotesFrame.Name = "RemotesFrame"
+	remotesFrame.Parent = mainFrame
+	remotesFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	remotesFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	remotesFrame.BackgroundColor3 = CONFIG.Colors.Background
+	remotesFrame.BorderSizePixel = 0
+	remotesFrame.ScrollBarThickness = 6
+	remotesFrame.ScrollBarImageColor3 = CONFIG.Colors.Border
+	remotesFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	remotesFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	remotesFrame.Visible = false
+
+	local remotesLayout = Instance.new("UIListLayout")
+	remotesLayout.Parent = remotesFrame
+	remotesLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	remotesLayout.Padding = UDim.new(0, 2)
+
+	local toolsFrame = Instance.new("ScrollingFrame")
+	toolsFrame.Name = "ToolsFrame"
+	toolsFrame.Parent = mainFrame
+	toolsFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	toolsFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	toolsFrame.BackgroundColor3 = CONFIG.Colors.Background
+	toolsFrame.BorderSizePixel = 0
+	toolsFrame.ScrollBarThickness = 6
+	toolsFrame.ScrollBarImageColor3 = CONFIG.Colors.Border
+	toolsFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	toolsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	toolsFrame.Visible = false
+
+	local toolsLayout = Instance.new("UIListLayout")
+	toolsLayout.Parent = toolsFrame
+	toolsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	toolsLayout.Padding = UDim.new(0, 5)
+
+	local settingsFrame = Instance.new("Frame")
+	settingsFrame.Name = "SettingsFrame"
+	settingsFrame.Parent = mainFrame
+	settingsFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	settingsFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	settingsFrame.BackgroundColor3 = CONFIG.Colors.Background
+	settingsFrame.BorderSizePixel = 0
+	settingsFrame.Visible = false
+
+	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame
 end
 
 -- ========================
@@ -585,6 +730,143 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 		hideBtn.BackgroundColor3 = State.hiddenGuis[obj] and CONFIG.Colors.AccentRed or CONFIG.Colors.Button
 	end)
 
+	-- MORE Button (...)
+	local moreBtn = Instance.new("TextButton")
+	moreBtn.Name = "MoreButton"
+	moreBtn.Parent = entry
+	moreBtn.Position = UDim2.new(1, -40, 0, 5)
+	moreBtn.Size = UDim2.new(0, 30, 0, 22)
+	moreBtn.BackgroundColor3 = CONFIG.Colors.Button
+	moreBtn.BorderSizePixel = 0
+	moreBtn.Font = CONFIG.FontBold
+	moreBtn.Text = "..."
+	moreBtn.TextColor3 = CONFIG.Colors.Text
+	moreBtn.TextSize = 14
+	moreBtn.AutoButtonColor = false
+	createUICorner(3).Parent = moreBtn
+
+	moreBtn.MouseEnter:Connect(function()
+		moreBtn.BackgroundColor3 = CONFIG.Colors.ButtonHover
+	end)
+	moreBtn.MouseLeave:Connect(function()
+		moreBtn.BackgroundColor3 = CONFIG.Colors.Button
+	end)
+
+	-- More menu (context menu)
+	local moreMenu = nil
+	moreBtn.MouseButton1Click:Connect(function()
+		if moreMenu then
+			moreMenu:Destroy()
+			moreMenu = nil
+			return
+		end
+
+		moreMenu = Instance.new("Frame")
+		moreMenu.Name = "MoreMenu"
+		moreMenu.Parent = entry
+		moreMenu.Position = UDim2.new(1, -180, 0, 28)
+		moreMenu.Size = UDim2.new(0, 170, 0, 0)
+		moreMenu.BackgroundColor3 = CONFIG.Colors.TopBar
+		moreMenu.BorderSizePixel = 1
+		moreMenu.BorderColor3 = CONFIG.Colors.Border
+		moreMenu.AutomaticSize = Enum.AutomaticSize.Y
+		moreMenu.ZIndex = 100
+		createUICorner(4).Parent = moreMenu
+
+		local menuLayout = Instance.new("UIListLayout")
+		menuLayout.Parent = moreMenu
+		menuLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		menuLayout.Padding = UDim.new(0, 2)
+
+		local menuPadding = Instance.new("UIPadding")
+		menuPadding.Parent = moreMenu
+		menuPadding.PaddingTop = UDim.new(0, 5)
+		menuPadding.PaddingBottom = UDim.new(0, 5)
+		menuPadding.PaddingLeft = UDim.new(0, 5)
+		menuPadding.PaddingRight = UDim.new(0, 5)
+
+		local menuOptions = {
+			{text = "Copy Path", callback = function()
+				local path = getFullPath(obj)
+				if copyToClipboard(path) then
+					print("Copied to clipboard:", path)
+				else
+					print("Path:", path)
+				end
+			end},
+			{text = "Copy Name", callback = function()
+				if copyToClipboard(obj.Name) then
+					print("Copied to clipboard:", obj.Name)
+				else
+					print("Name:", obj.Name)
+				end
+			end},
+			{text = "View Properties", callback = function()
+				print("=== PROPERTIES:", obj:GetFullName(), "===")
+				for _, prop in ipairs({"Name", "ClassName", "Parent", "Visible", "Position", "Size", "BackgroundColor3", "BackgroundTransparency"}) do
+					local success, value = pcall(function() return obj[prop] end)
+					if success then
+						print(prop .. ":", formatValue(value))
+					end
+				end
+				print("===========================")
+			end},
+			{text = "Clone Object", callback = function()
+				local success, clone = pcall(function()
+					return obj:Clone()
+				end)
+				if success then
+					print("Cloned:", obj.Name, "->", clone:GetFullName())
+				else
+					print("Failed to clone:", obj.Name)
+				end
+			end},
+			{text = "Destroy Object", callback = function()
+				print("Destroyed:", obj:GetFullName())
+				obj:Destroy()
+				if onRefresh then
+					onRefresh()
+				end
+			end},
+		}
+
+		for i, option in ipairs(menuOptions) do
+			local optionBtn = Instance.new("TextButton")
+			optionBtn.Name = option.text
+			optionBtn.Parent = moreMenu
+			optionBtn.Size = UDim2.new(1, 0, 0, 26)
+			optionBtn.BackgroundColor3 = CONFIG.Colors.Button
+			optionBtn.BorderSizePixel = 0
+			optionBtn.Font = CONFIG.Font
+			optionBtn.Text = option.text
+			optionBtn.TextColor3 = CONFIG.Colors.Text
+			optionBtn.TextSize = 11
+			optionBtn.TextXAlignment = Enum.TextXAlignment.Left
+			optionBtn.AutoButtonColor = false
+			optionBtn.LayoutOrder = i
+			createUICorner(3).Parent = optionBtn
+
+			local btnPadding = Instance.new("UIPadding")
+			btnPadding.Parent = optionBtn
+			btnPadding.PaddingLeft = UDim.new(0, 8)
+
+			optionBtn.MouseEnter:Connect(function()
+				optionBtn.BackgroundColor3 = CONFIG.Colors.ButtonHover
+			end)
+			optionBtn.MouseLeave:Connect(function()
+				optionBtn.BackgroundColor3 = CONFIG.Colors.Button
+			end)
+
+			optionBtn.MouseButton1Click:Connect(function()
+				option.callback()
+				if moreMenu then
+					moreMenu:Destroy()
+					moreMenu = nil
+				end
+			end)
+		end
+	end)
+
 	-- Freeze individual button logic
 	freezeIndividualBtn.MouseButton1Click:Connect(function()
 		if State.frozenIndividual[obj] then
@@ -791,11 +1073,278 @@ end
 -- INITIALIZE
 -- ========================
 
+-- ========================
+-- REMOTE SPY
+-- ========================
+
+local function setupRemoteSpy(remotesFrame)
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+	-- Hook RemoteEvent
+	local oldFireServer
+	oldFireServer = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		local args = {...}
+
+		if method == "FireServer" or method == "InvokeServer" then
+			if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
+				table.insert(State.remoteLogs, {
+					time = os.date("%H:%M:%S"),
+					remote = self:GetFullName(),
+					type = self.ClassName,
+					method = method,
+					args = args
+				})
+				print("[REMOTE]", method, "->", self:GetFullName())
+			end
+		end
+
+		return oldFireServer(self, ...)
+	end)
+end
+
+local function refreshRemotesList(remotesFrame)
+	for _, child in ipairs(remotesFrame:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+
+	for i, log in ipairs(State.remoteLogs) do
+		if i > 50 then break end -- Limit to last 50
+
+		local logEntry = Instance.new("Frame")
+		logEntry.Name = "LogEntry_" .. i
+		logEntry.Parent = remotesFrame
+		logEntry.Size = UDim2.new(1, -10, 0, 60)
+		logEntry.BackgroundColor3 = CONFIG.Colors.Button
+		logEntry.BorderSizePixel = 0
+		logEntry.LayoutOrder = #State.remoteLogs - i + 1
+		createUICorner(4).Parent = logEntry
+
+		local timeLabel = Instance.new("TextLabel")
+		timeLabel.Parent = logEntry
+		timeLabel.Position = UDim2.new(0, 8, 0, 5)
+		timeLabel.Size = UDim2.new(0, 60, 0, 15)
+		timeLabel.BackgroundTransparency = 1
+		timeLabel.Font = CONFIG.Font
+		timeLabel.Text = log.time
+		timeLabel.TextColor3 = CONFIG.Colors.TextDim
+		timeLabel.TextSize = 10
+		timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		local typeLabel = Instance.new("TextLabel")
+		typeLabel.Parent = logEntry
+		typeLabel.Position = UDim2.new(0, 75, 0, 5)
+		typeLabel.Size = UDim2.new(0, 100, 0, 15)
+		typeLabel.BackgroundTransparency = 1
+		typeLabel.Font = CONFIG.FontBold
+		typeLabel.Text = log.method
+		typeLabel.TextColor3 = CONFIG.Colors.AccentBlue
+		typeLabel.TextSize = 10
+		typeLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		local remoteLabel = Instance.new("TextLabel")
+		remoteLabel.Parent = logEntry
+		remoteLabel.Position = UDim2.new(0, 8, 0, 22)
+		remoteLabel.Size = UDim2.new(1, -16, 0, 35)
+		remoteLabel.BackgroundTransparency = 1
+		remoteLabel.Font = CONFIG.Font
+		remoteLabel.Text = log.remote
+		remoteLabel.TextColor3 = CONFIG.Colors.Text
+		remoteLabel.TextSize = 11
+		remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
+		remoteLabel.TextYAlignment = Enum.TextYAlignment.Top
+		remoteLabel.TextWrapped = true
+	end
+end
+
+local function populateToolsTab(toolsFrame)
+	local tools = {
+		{
+			name = "Scan All Remotes",
+			desc = "Find all RemoteEvents and RemoteFunctions",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				print("=== SCANNING REMOTES ===")
+				local count = 0
+				for _, desc in ipairs(game:GetDescendants()) do
+					if desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction") then
+						print(desc.ClassName, "->", desc:GetFullName())
+						count = count + 1
+					end
+				end
+				print("Total found:", count)
+				print("=======================")
+			end
+		},
+		{
+			name = "List All Scripts",
+			desc = "Find all LocalScripts and Scripts",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				print("=== SCANNING SCRIPTS ===")
+				local count = 0
+				for _, desc in ipairs(game:GetDescendants()) do
+					if desc:IsA("LocalScript") or desc:IsA("Script") then
+						print(desc.ClassName, "->", desc:GetFullName())
+						count = count + 1
+					end
+				end
+				print("Total found:", count)
+				print("========================")
+			end
+		},
+		{
+			name = "Dump Game Tree",
+			desc = "Print entire game hierarchy",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				print("=== GAME TREE DUMP ===")
+				local function printTree(obj, depth)
+					if depth > 5 then return end
+					print(string.rep("  ", depth) .. obj.ClassName .. ": " .. obj.Name)
+					for _, child in ipairs(obj:GetChildren()) do
+						printTree(child, depth + 1)
+					end
+				end
+				printTree(game, 0)
+				print("======================")
+			end
+		},
+		{
+			name = "Clear Console",
+			desc = "Clear output console (if supported)",
+			color = CONFIG.Colors.AccentRed,
+			callback = function()
+				if rconsoleclear then
+					rconsoleclear()
+				end
+				print("\n\n\n\n\n\n\n\n\n\n")
+				print("Console cleared")
+			end
+		},
+	}
+
+	for i, tool in ipairs(tools) do
+		local toolCard = Instance.new("Frame")
+		toolCard.Name = "Tool_" .. i
+		toolCard.Parent = toolsFrame
+		toolCard.Size = UDim2.new(1, -10, 0, 70)
+		toolCard.BackgroundColor3 = CONFIG.Colors.Button
+		toolCard.BorderSizePixel = 0
+		toolCard.LayoutOrder = i
+		createUICorner(6).Parent = toolCard
+
+		local colorBar = Instance.new("Frame")
+		colorBar.Parent = toolCard
+		colorBar.Size = UDim2.new(0, 4, 1, 0)
+		colorBar.BackgroundColor3 = tool.color
+		colorBar.BorderSizePixel = 0
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Parent = toolCard
+		nameLabel.Position = UDim2.new(0, 15, 0, 8)
+		nameLabel.Size = UDim2.new(1, -120, 0, 20)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Font = CONFIG.FontBold
+		nameLabel.Text = tool.name
+		nameLabel.TextColor3 = CONFIG.Colors.Text
+		nameLabel.TextSize = 14
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		local descLabel = Instance.new("TextLabel")
+		descLabel.Parent = toolCard
+		descLabel.Position = UDim2.new(0, 15, 0, 30)
+		descLabel.Size = UDim2.new(1, -120, 0, 30)
+		descLabel.BackgroundTransparency = 1
+		descLabel.Font = CONFIG.Font
+		descLabel.Text = tool.desc
+		descLabel.TextColor3 = CONFIG.Colors.TextDim
+		descLabel.TextSize = 11
+		descLabel.TextXAlignment = Enum.TextXAlignment.Left
+		descLabel.TextWrapped = true
+
+		local runBtn = Instance.new("TextButton")
+		runBtn.Parent = toolCard
+		runBtn.Position = UDim2.new(1, -95, 0.5, -15)
+		runBtn.Size = UDim2.new(0, 85, 0, 30)
+		runBtn.BackgroundColor3 = tool.color
+		runBtn.BorderSizePixel = 0
+		runBtn.Font = CONFIG.FontBold
+		runBtn.Text = "RUN"
+		runBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		runBtn.TextSize = 13
+		runBtn.AutoButtonColor = false
+		createUICorner(4).Parent = runBtn
+
+		runBtn.MouseEnter:Connect(function()
+			runBtn.BackgroundColor3 = Color3.new(
+				math.min(tool.color.R + 0.1, 1),
+				math.min(tool.color.G + 0.1, 1),
+				math.min(tool.color.B + 0.1, 1)
+			)
+		end)
+		runBtn.MouseLeave:Connect(function()
+			runBtn.BackgroundColor3 = tool.color
+		end)
+		runBtn.MouseButton1Click:Connect(tool.callback)
+	end
+end
+
 local function initialize()
-	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn = createMainWindow()
+	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame = createMainWindow()
 
 	-- Store reference for show/hide functions
 	debugToolInstance = screenGui
+
+	-- Setup Remote Spy
+	pcall(function()
+		if hookmetamethod then
+			setupRemoteSpy(remotesFrame)
+		end
+	end)
+
+	-- Populate Tools tab
+	populateToolsTab(toolsFrame)
+
+	-- Tab switching logic
+	local function switchTab(tabName)
+		State.currentTab = tabName
+
+		-- Update button colors
+		for name, btn in pairs(tabButtons) do
+			btn.BackgroundColor3 = (name == tabName) and CONFIG.Colors.ButtonActive or CONFIG.Colors.Button
+		end
+
+		-- Show/hide content
+		contentFrame.Visible = (tabName == "GUIs")
+		toolbar.Visible = (tabName == "GUIs")
+		remotesFrame.Visible = (tabName == "Remotes")
+		toolsFrame.Visible = (tabName == "Tools")
+		settingsFrame.Visible = (tabName == "Settings")
+
+		if tabName == "Remotes" then
+			refreshRemotesList(remotesFrame)
+		end
+	end
+
+	-- Connect tab buttons
+	for tabName, btn in pairs(tabButtons) do
+		btn.MouseEnter:Connect(function()
+			if State.currentTab ~= tabName then
+				btn.BackgroundColor3 = CONFIG.Colors.ButtonHover
+			end
+		end)
+		btn.MouseLeave:Connect(function()
+			if State.currentTab ~= tabName then
+				btn.BackgroundColor3 = CONFIG.Colors.Button
+			end
+		end)
+		btn.MouseButton1Click:Connect(function()
+			switchTab(tabName)
+		end)
+	end
 
 	-- Make draggable
 	local topBar = mainFrame:FindFirstChild("TopBar")

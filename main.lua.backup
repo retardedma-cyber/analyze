@@ -697,7 +697,7 @@ local function hideGuiObject(obj)
 	end
 end
 
-local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
+local function createGuiEntry(parent, obj, depth, onRefresh)
 	local entryHeight = 32
 	local indentSize = depth * 20
 
@@ -876,132 +876,17 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 			return
 		end
 
-		-- Create GUI preview window instead of just a menu
-		local previewWindow = Instance.new("Frame")
-		previewWindow.Name = "PreviewWindow"
-		previewWindow.Parent = screenGui
-		previewWindow.Position = UDim2.new(0.5, -200, 0.5, -250)
-		previewWindow.Size = UDim2.new(0, 400, 0, 500)
-		previewWindow.BackgroundColor3 = CONFIG.Colors.Background
-		previewWindow.BorderSizePixel = 1
-		previewWindow.BorderColor3 = CONFIG.Colors.Border
-		previewWindow.ZIndex = 2000
-		createUICorner(8).Parent = previewWindow
-
-		-- Preview window title bar
-		local previewTitleBar = Instance.new("Frame")
-		previewTitleBar.Parent = previewWindow
-		previewTitleBar.Size = UDim2.new(1, 0, 0, 30)
-		previewTitleBar.BackgroundColor3 = CONFIG.Colors.TopBar
-		previewTitleBar.BorderSizePixel = 0
-		createUICorner(8).Parent = previewTitleBar
-
-		local previewTitle = Instance.new("TextLabel")
-		previewTitle.Parent = previewTitleBar
-		previewTitle.Position = UDim2.new(0, 10, 0, 0)
-		previewTitle.Size = UDim2.new(1, -40, 1, 0)
-		previewTitle.BackgroundTransparency = 1
-		previewTitle.Font = CONFIG.FontBold
-		previewTitle.Text = "GUI Preview: " .. obj.Name
-		previewTitle.TextColor3 = CONFIG.Colors.Text
-		previewTitle.TextSize = 13
-		previewTitle.TextXAlignment = Enum.TextXAlignment.Left
-		previewTitle.TextTruncate = Enum.TextTruncate.AtEnd
-
-		-- Close button for preview
-		local previewCloseBtn = Instance.new("TextButton")
-		previewCloseBtn.Parent = previewTitleBar
-		previewCloseBtn.Position = UDim2.new(1, -25, 0.5, -12)
-		previewCloseBtn.Size = UDim2.new(0, 24, 0, 24)
-		previewCloseBtn.BackgroundColor3 = CONFIG.Colors.AccentRed
-		previewCloseBtn.BorderSizePixel = 0
-		previewCloseBtn.Font = CONFIG.FontBold
-		previewCloseBtn.Text = "X"
-		previewCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		previewCloseBtn.TextSize = 14
-		previewCloseBtn.AutoButtonColor = false
-		createUICorner(3).Parent = previewCloseBtn
-
-		previewCloseBtn.MouseButton1Click:Connect(function()
-			previewWindow:Destroy()
-			moreMenu = nil
-		end)
-
-		-- Preview content scroll
-		local previewScroll = Instance.new("ScrollingFrame")
-		previewScroll.Parent = previewWindow
-		previewScroll.Position = UDim2.new(0, 5, 0, 35)
-		previewScroll.Size = UDim2.new(1, -10, 1, -40)
-		previewScroll.BackgroundColor3 = CONFIG.Colors.Button
-		previewScroll.BorderSizePixel = 0
-		previewScroll.ScrollBarThickness = 6
-		previewScroll.ScrollBarImageColor3 = CONFIG.Colors.Border
-		previewScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-		previewScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-		createUICorner(6).Parent = previewScroll
-
-		local previewLayout = Instance.new("UIListLayout")
-		previewLayout.Parent = previewScroll
-		previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		previewLayout.Padding = UDim.new(0, 5)
-
-		local previewPadding = Instance.new("UIPadding")
-		previewPadding.Parent = previewScroll
-		previewPadding.PaddingTop = UDim.new(0, 8)
-		previewPadding.PaddingBottom = UDim.new(0, 8)
-		previewPadding.PaddingLeft = UDim.new(0, 8)
-		previewPadding.PaddingRight = UDim.new(0, 8)
-
-		-- Add GUI properties to preview
-		local propertiesToShow = {"Name", "ClassName", "Visible", "Position", "Size", "BackgroundColor3", "BackgroundTransparency", "ZIndex", "Parent"}
-
-		for i, propName in ipairs(propertiesToShow) do
-			local success, value = pcall(function() return obj[propName] end)
-			if success then
-				local propFrame = Instance.new("Frame")
-				propFrame.Parent = previewScroll
-				propFrame.Size = UDim2.new(1, -5, 0, 40)
-				propFrame.BackgroundColor3 = CONFIG.Colors.Background
-				propFrame.BorderSizePixel = 0
-				propFrame.LayoutOrder = i
-				createUICorner(4).Parent = propFrame
-
-				local propLabel = Instance.new("TextLabel")
-				propLabel.Parent = propFrame
-				propLabel.Position = UDim2.new(0, 8, 0, 5)
-				propLabel.Size = UDim2.new(1, -16, 0, 15)
-				propLabel.BackgroundTransparency = 1
-				propLabel.Font = CONFIG.FontBold
-				propLabel.Text = propName
-				propLabel.TextColor3 = CONFIG.Colors.AccentBlue
-				propLabel.TextSize = 11
-				propLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-				local valueLabel = Instance.new("TextLabel")
-				valueLabel.Parent = propFrame
-				valueLabel.Position = UDim2.new(0, 8, 0, 20)
-				valueLabel.Size = UDim2.new(1, -16, 0, 15)
-				valueLabel.BackgroundTransparency = 1
-				valueLabel.Font = CONFIG.Font
-				valueLabel.Text = formatValue(value)
-				valueLabel.TextColor3 = CONFIG.Colors.Text
-				valueLabel.TextSize = 10
-				valueLabel.TextXAlignment = Enum.TextXAlignment.Left
-				valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
-			end
-		end
-
-		-- Action buttons section
-		local actionsFrame = Instance.new("Frame")
-		actionsFrame.Parent = previewScroll
-		actionsFrame.Size = UDim2.new(1, -5, 0, 0)
-		actionsFrame.BackgroundColor3 = CONFIG.Colors.TopBar
-		actionsFrame.BorderSizePixel = 0
-		actionsFrame.AutomaticSize = Enum.AutomaticSize.Y
-		actionsFrame.LayoutOrder = 1000
-		createUICorner(4).Parent = actionsFrame
-
-		moreMenu = actionsFrame
+		moreMenu = Instance.new("Frame")
+		moreMenu.Name = "MoreMenu"
+		moreMenu.Parent = screenGui or entry.Parent.Parent.Parent  -- Parent to screenGui for proper z-index
+		moreMenu.Position = UDim2.new(0, moreBtn.AbsolutePosition.X - 150, 0, moreBtn.AbsolutePosition.Y + 30)
+		moreMenu.Size = UDim2.new(0, 170, 0, 0)
+		moreMenu.BackgroundColor3 = CONFIG.Colors.TopBar
+		moreMenu.BorderSizePixel = 1
+		moreMenu.BorderColor3 = CONFIG.Colors.Border
+		moreMenu.AutomaticSize = Enum.AutomaticSize.Y
+		moreMenu.ZIndex = 1000
+		createUICorner(4).Parent = moreMenu
 
 		local menuLayout = Instance.new("UIListLayout")
 		menuLayout.Parent = moreMenu
@@ -1166,7 +1051,7 @@ local function createGuiEntry(parent, obj, depth, onRefresh, screenGui)
 				local childrenToDisplay = State.frozenIndividual[obj] or obj:GetChildren()
 				for i, child in ipairs(childrenToDisplay) do
 					if child:IsA("GuiObject") or isGuiRoot(child) then
-						local childEntry = createGuiEntry(childContainer, child, depth + 1, onRefresh, screenGui)
+						local childEntry = createGuiEntry(childContainer, child, depth + 1, onRefresh)
 						childEntry.LayoutOrder = i
 					end
 				end
@@ -1189,7 +1074,7 @@ local function matchesSearch(obj, query)
 	return string.find(lowerName, lowerQuery, 1, true) ~= nil
 end
 
-local function scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+local function scanAndDisplayGuis(contentFrame, statusLabel)
 	-- Clear existing content
 	for _, child in ipairs(contentFrame:GetChildren()) do
 		if child:IsA("Frame") then
@@ -1200,7 +1085,6 @@ local function scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
 	State.expanded = {}
 
 	local guiList = {}
-	screenGui = screenGui or contentFrame:FindFirstAncestorOfClass("ScreenGui")
 
 	-- Use frozen data if freeze is active
 	if State.frozen and State.frozenData then
@@ -1252,8 +1136,8 @@ local function scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
 	-- Display filtered root GUIs
 	for i, gui in ipairs(filteredList) do
 		local entry = createGuiEntry(contentFrame, gui, 0, function()
-			scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
-		end, screenGui)
+			scanAndDisplayGuis(contentFrame, statusLabel)
+		end)
 		entry.LayoutOrder = i
 	end
 end
@@ -1311,63 +1195,27 @@ end
 local function setupRemoteSpy(remotesFrame)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-	-- Try to hook RemoteEvent/RemoteFunction calls
-	local hookSuccess = false
-	local hookError = nil
+	-- Hook RemoteEvent
+	local oldFireServer
+	oldFireServer = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		local args = {...}
 
-	-- Method 1: Try hookmetamethod
-	if hookmetamethod and getnamecallmethod then
-		local success, err = pcall(function()
-			local oldNamecall
-			oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-				local method = getnamecallmethod()
-				local args = {...}
-
-				if method == "FireServer" or method == "InvokeServer" then
-					if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
-						local logEntry = {
-							time = os.date("%H:%M:%S"),
-							remote = self:GetFullName(),
-							type = self.ClassName,
-							method = method,
-							args = args
-						}
-						table.insert(State.remoteLogs, 1, logEntry) -- Insert at beginning for newest first
-
-						-- Only print if debug output is enabled
-						if State.debugOutput then
-							print("[REMOTE SPY]", method, "->", self:GetFullName())
-						end
-					end
-				end
-
-				return oldNamecall(self, ...)
-			end)
-		end)
-
-		if success then
-			hookSuccess = true
-			print("[REMOTE SPY] Successfully hooked via hookmetamethod")
-		else
-			hookError = tostring(err)
-			print("[REMOTE SPY] hookmetamethod failed:", err)
+		if method == "FireServer" or method == "InvokeServer" then
+			if self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
+				table.insert(State.remoteLogs, {
+					time = os.date("%H:%M:%S"),
+					remote = self:GetFullName(),
+					type = self.ClassName,
+					method = method,
+					args = args
+				})
+				print("[REMOTE]", method, "->", self:GetFullName())
+			end
 		end
-	end
 
-	-- Method 2: Fallback - scan for existing remotes
-	if not hookSuccess then
-		print("[REMOTE SPY] Using passive scanning mode")
-		-- Add a note that we're in passive mode
-		table.insert(State.remoteLogs, {
-			time = os.date("%H:%M:%S"),
-			remote = "SYSTEM",
-			type = "INFO",
-			method = "Passive Mode",
-			args = {"Remote spy is in passive mode - use 'Scan All Remotes' in Tools tab"}
-		})
-	end
-
-	return hookSuccess, hookError
+		return oldFireServer(self, ...)
+	end)
 end
 
 local function refreshRemotesList(remotesFrame)
@@ -1557,216 +1405,6 @@ local function populateToolsTab(toolsFrame)
 					end
 				end
 				print("======================")
-			end
-		},
-		{
-			name = "Decompile Scripts",
-			desc = "Attempt to decompile all scripts (requires decompile function)",
-			color = CONFIG.Colors.AccentPurple,
-			callback = function()
-				print("=== DECOMPILING SCRIPTS ===")
-				if decompile then
-					local count = 0
-					for _, desc in ipairs(game:GetDescendants()) do
-						if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
-							local success, source = pcall(function()
-								return decompile(desc)
-							end)
-							if success then
-								print("✓ Decompiled:", desc:GetFullName())
-								print("Source length:", #source, "characters")
-								count = count + 1
-							else
-								print("✗ Failed:", desc:GetFullName())
-							end
-						end
-					end
-					print("Successfully decompiled:", count)
-				else
-					print("decompile() function not available")
-				end
-				print("===========================")
-			end
-		},
-		{
-			name = "Find Hidden GUIs",
-			desc = "Locate all invisible or hidden GUI elements",
-			color = CONFIG.Colors.AccentRed,
-			callback = function()
-				print("=== HIDDEN GUIs ===")
-				local count = 0
-				for _, desc in ipairs(game:GetDescendants()) do
-					if desc:IsA("GuiObject") then
-						local isHidden = false
-						if not desc.Visible then
-							isHidden = true
-						end
-						local parent = desc.Parent
-						while parent and parent ~= game do
-							if parent:IsA("ScreenGui") and not parent.Enabled then
-								isHidden = true
-								break
-							end
-							if parent:IsA("GuiObject") and not parent.Visible then
-								isHidden = true
-								break
-							end
-							parent = parent.Parent
-						end
-						if isHidden then
-							print("Hidden:", desc.ClassName, "->", desc:GetFullName())
-							count = count + 1
-						end
-					end
-				end
-				print("Total hidden GUIs:", count)
-				print("===================")
-			end
-		},
-		{
-			name = "Scan ValueBase Objects",
-			desc = "Find all Value objects (StringValue, IntValue, etc.)",
-			color = CONFIG.Colors.AccentGreen,
-			callback = function()
-				print("=== VALUE OBJECTS ===")
-				local values = {}
-				for _, desc in ipairs(game:GetDescendants()) do
-					if desc:IsA("ValueBase") then
-						local valType = desc.ClassName
-						values[valType] = values[valType] or {}
-						table.insert(values[valType], desc)
-					end
-				end
-				for valType, list in pairs(values) do
-					print(valType .. ":", #list)
-					for i, obj in ipairs(list) do
-						if i <= 10 then -- Show first 10 of each type
-							local success, val = pcall(function() return obj.Value end)
-							if success then
-								print("  -", obj:GetFullName(), "=", tostring(val))
-							end
-						end
-					end
-					if #list > 10 then
-						print("  ... and", #list - 10, "more")
-					end
-				end
-				print("=====================")
-			end
-		},
-		{
-			name = "Get Game Stats",
-			desc = "Show detailed game statistics and info",
-			color = CONFIG.Colors.AccentBlue,
-			callback = function()
-				print("=== GAME STATISTICS ===")
-				print("Game ID:", game.GameId)
-				print("Place ID:", game.PlaceId)
-				print("Creator Type:", game.CreatorType)
-				print("Creator ID:", game.CreatorId)
-				print("Players:", #game:GetService("Players"):GetPlayers())
-				print("Total Instances:", #game:GetDescendants())
-				print("Workspace Children:", #workspace:GetChildren())
-
-				local services = {"ReplicatedStorage", "ReplicatedFirst", "ServerStorage", "ServerScriptService", "StarterPlayer", "StarterPack", "StarterGui", "Lighting"}
-				print("\nServices:")
-				for _, serviceName in ipairs(services) do
-					local success, service = pcall(function() return game:GetService(serviceName) end)
-					if success then
-						print("  " .. serviceName .. ":", #service:GetChildren(), "children")
-					end
-				end
-				print("=======================")
-			end
-		},
-		{
-			name = "Find All Assets",
-			desc = "Scan for all rbxasset:// and rbxassetid:// references",
-			color = CONFIG.Colors.AccentYellow,
-			callback = function()
-				print("=== ASSET SCANNER ===")
-				local assets = {}
-				for _, desc in ipairs(game:GetDescendants()) do
-					for _, prop in ipairs({"Image", "Texture", "SoundId", "MeshId", "VideoId"}) do
-						local success, value = pcall(function() return desc[prop] end)
-						if success and type(value) == "string" and value ~= "" then
-							if not assets[value] then
-								assets[value] = {count = 0, instances = {}}
-							end
-							assets[value].count = assets[value].count + 1
-							table.insert(assets[value].instances, desc:GetFullName())
-						end
-					end
-				end
-				print("Unique assets found:", #assets)
-				local sorted = {}
-				for asset, data in pairs(assets) do
-					table.insert(sorted, {asset = asset, count = data.count})
-				end
-				table.sort(sorted, function(a, b) return a.count > b.count end)
-				for i = 1, math.min(20, #sorted) do
-					print(sorted[i].count .. "x:", sorted[i].asset)
-				end
-				print("=====================")
-			end
-		},
-		{
-			name = "Character Inspector",
-			desc = "Inspect local player character and humanoid",
-			color = CONFIG.Colors.AccentPurple,
-			callback = function()
-				print("=== CHARACTER INFO ===")
-				local player = game:GetService("Players").LocalPlayer
-				local char = player.Character
-				if char then
-					print("Character:", char.Name)
-					local humanoid = char:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						print("Health:", humanoid.Health, "/", humanoid.MaxHealth)
-						print("WalkSpeed:", humanoid.WalkSpeed)
-						print("JumpPower:", humanoid.JumpPower)
-						print("State:", humanoid:GetState())
-					end
-					local root = char:FindFirstChild("HumanoidRootPart")
-					if root then
-						print("Position:", root.Position)
-						print("CFrame:", root.CFrame)
-					end
-					print("\nParts:")
-					for _, part in ipairs(char:GetChildren()) do
-						if part:IsA("BasePart") then
-							print("  -", part.Name, "| Size:", part.Size)
-						end
-					end
-				else
-					print("Character not loaded")
-				end
-				print("======================")
-			end
-		},
-		{
-			name = "Dump All Attributes",
-			desc = "Find all instances with custom attributes",
-			color = CONFIG.Colors.AccentGreen,
-			callback = function()
-				print("=== ATTRIBUTES DUMP ===")
-				local count = 0
-				for _, desc in ipairs(game:GetDescendants()) do
-					local attrs = desc:GetAttributes()
-					local hasAttrs = false
-					for k, v in pairs(attrs) do
-						if not hasAttrs then
-							print("\n" .. desc:GetFullName())
-							hasAttrs = true
-						end
-						print("  [" .. k .. "]", "=", formatValue(v))
-					end
-					if hasAttrs then
-						count = count + 1
-					end
-				end
-				print("\nTotal instances with attributes:", count)
-				print("=======================")
 			end
 		},
 	}
@@ -1976,35 +1614,10 @@ local function setupChatSpy(chatScroll)
 	local StarterGui = game:GetService("StarterGui")
 	local Players = game:GetService("Players")
 	local player = Players.LocalPlayer
+	local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
 
-	-- Try to find chat system
-	local chatEvents = nil
-	local success, err = pcall(function()
-		chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-	end)
-
-	if not success or not chatEvents then
-		-- Chat system not found - add error message to chat window
-		local errorMsg = Instance.new("TextLabel")
-		errorMsg.Parent = chatScroll
-		errorMsg.Size = UDim2.new(1, -10, 0, 60)
-		errorMsg.BackgroundColor3 = CONFIG.Colors.AccentRed
-		errorMsg.BorderSizePixel = 0
-		errorMsg.Font = CONFIG.Font
-		errorMsg.Text = "⚠ Chat Spy Not Available\n\nDefaultChatSystemChatEvents not found.\nThis game may use a custom chat system or new TextChatService."
-		errorMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
-		errorMsg.TextSize = 12
-		errorMsg.TextWrapped = true
-		errorMsg.TextYAlignment = Enum.TextYAlignment.Top
-		createUICorner(6).Parent = errorMsg
-
-		local msgPadding = Instance.new("UIPadding")
-		msgPadding.Parent = errorMsg
-		msgPadding.PaddingTop = UDim.new(0, 8)
-		msgPadding.PaddingLeft = UDim.new(0, 8)
-		msgPadding.PaddingRight = UDim.new(0, 8)
-
-		print("[CHAT SPY] Chat system not found - DefaultChatSystemChatEvents missing")
+	if not chatEvents then
+		print("[CHAT SPY] Chat system not found")
 		return false
 	end
 
@@ -2012,27 +1625,7 @@ local function setupChatSpy(chatScroll)
 	local getmsg = chatEvents:FindFirstChild("OnMessageDoneFiltering")
 
 	if not saymsg or not getmsg then
-		-- Chat events not complete
-		local errorMsg = Instance.new("TextLabel")
-		errorMsg.Parent = chatScroll
-		errorMsg.Size = UDim2.new(1, -10, 0, 60)
-		errorMsg.BackgroundColor3 = CONFIG.Colors.AccentRed
-		errorMsg.BorderSizePixel = 0
-		errorMsg.Font = CONFIG.Font
-		errorMsg.Text = "⚠ Chat Events Incomplete\n\nMissing: " .. (not saymsg and "SayMessageRequest " or "") .. (not getmsg and "OnMessageDoneFiltering" or "")
-		errorMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
-		errorMsg.TextSize = 12
-		errorMsg.TextWrapped = true
-		errorMsg.TextYAlignment = Enum.TextYAlignment.Top
-		createUICorner(6).Parent = errorMsg
-
-		local msgPadding = Instance.new("UIPadding")
-		msgPadding.Parent = errorMsg
-		msgPadding.PaddingTop = UDim.new(0, 8)
-		msgPadding.PaddingLeft = UDim.new(0, 8)
-		msgPadding.PaddingRight = UDim.new(0, 8)
-
-		print("[CHAT SPY] Chat events incomplete")
+		print("[CHAT SPY] Chat events not found")
 		return false
 	end
 
@@ -2110,60 +1703,32 @@ local function setupChatSpy(chatScroll)
 		end
 	end
 
-	-- Wrap connections in pcall for safety
-	local connectSuccess = pcall(function()
-		-- Connect to all players
-		for _, p in ipairs(Players:GetPlayers()) do
-			p.Chatted:Connect(function(msg) onChatted(p, msg) end)
-		end
+	-- Connect to all players
+	for _, p in ipairs(Players:GetPlayers()) do
+		p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+	end
 
-		Players.PlayerAdded:Connect(function(p)
-			p.Chatted:Connect(function(msg) onChatted(p, msg) end)
-			addChatMessage("SYSTEM", p.Name .. " joined the game", false)
-		end)
-
-		Players.PlayerRemoving:Connect(function(p)
-			addChatMessage("SYSTEM", p.Name .. " left the game", false)
-		end)
-
-		-- Monitor public messages too
-		getmsg.OnClientEvent:Connect(function(packet, channel)
-			if packet.SpeakerUserId ~= player.UserId then
-				local senderPlayer = Players:GetPlayerByUserId(packet.SpeakerUserId)
-				if senderPlayer then
-					addChatMessage(senderPlayer.Name, packet.Message, false)
-				end
-			end
-		end)
+	Players.PlayerAdded:Connect(function(p)
+		p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+		addChatMessage("SYSTEM", p.Name .. " joined the game", false)
 	end)
 
-	if connectSuccess then
-		-- Add success message to chat
-		local successMsg = Instance.new("TextLabel")
-		successMsg.Parent = chatScroll
-		successMsg.Size = UDim2.new(1, -10, 0, 40)
-		successMsg.BackgroundColor3 = CONFIG.Colors.AccentGreen
-		successMsg.BorderSizePixel = 0
-		successMsg.Font = CONFIG.FontBold
-		successMsg.Text = "✓ Chat Spy Active\n\nMonitoring all chat messages including private/whisper messages"
-		successMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
-		successMsg.TextSize = 11
-		successMsg.TextWrapped = true
-		successMsg.TextYAlignment = Enum.TextYAlignment.Top
-		createUICorner(6).Parent = successMsg
+	Players.PlayerRemoving:Connect(function(p)
+		addChatMessage("SYSTEM", p.Name .. " left the game", false)
+	end)
 
-		local successPadding = Instance.new("UIPadding")
-		successPadding.Parent = successMsg
-		successPadding.PaddingTop = UDim.new(0, 8)
-		successPadding.PaddingLeft = UDim.new(0, 8)
-		successPadding.PaddingRight = UDim.new(0, 8)
+	-- Monitor public messages too
+	getmsg.OnClientEvent:Connect(function(packet, channel)
+		if packet.SpeakerUserId ~= player.UserId then
+			local senderPlayer = Players:GetPlayerByUserId(packet.SpeakerUserId)
+			if senderPlayer then
+				addChatMessage(senderPlayer.Name, packet.Message, false)
+			end
+		end
+	end)
 
-		print("[CHAT SPY] Enabled successfully")
-		return true
-	else
-		print("[CHAT SPY] Failed to connect events")
-		return false
-	end
+	print("[CHAT SPY] Enabled successfully")
+	return true
 end
 
 local function initialize()
@@ -2173,22 +1738,22 @@ local function initialize()
 	debugToolInstance = screenGui
 
 	-- Setup Remote Spy
-	local remoteSpyActive, spyError = setupRemoteSpy(remotesFrame)
-
-	if remoteSpyActive then
-		remotesStatus.Text = "Active (Hooked) | " .. #State.remoteLogs .. " logs"
-		remotesStatus.TextColor3 = CONFIG.Colors.AccentGreen
-	else
-		if spyError then
-			remotesStatus.Text = "Passive Mode | Error: " .. (spyError or "Unknown")
-			remotesStatus.TextColor3 = CONFIG.Colors.AccentYellow
-		elseif not hookmetamethod or not getnamecallmethod then
-			remotesStatus.Text = "Passive Mode | hookmetamethod not available"
-			remotesStatus.TextColor3 = CONFIG.Colors.AccentYellow
+	local remoteSpyActive = false
+	pcall(function()
+		if hookmetamethod and getnamecallmethod then
+			setupRemoteSpy(remotesFrame)
+			remoteSpyActive = true
+			remotesStatus.Text = "Active | " .. #State.remoteLogs .. " logs"
+			remotesStatus.TextColor3 = CONFIG.Colors.AccentGreen
 		else
-			remotesStatus.Text = "Passive Mode | Use Tools tab to scan"
-			remotesStatus.TextColor3 = CONFIG.Colors.AccentYellow
+			remotesStatus.Text = "Not supported (hookmetamethod unavailable)"
+			remotesStatus.TextColor3 = CONFIG.Colors.AccentRed
 		end
+	end)
+
+	if not remoteSpyActive then
+		remotesStatus.Text = "Not supported (exploit limitation)"
+		remotesStatus.TextColor3 = CONFIG.Colors.AccentRed
 	end
 
 	-- Refresh remotes button
@@ -2291,7 +1856,7 @@ local function initialize()
 	-- Search functionality
 	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 		State.searchQuery = searchBox.Text
-		scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+		scanAndDisplayGuis(contentFrame, statusLabel)
 	end)
 
 	clearSearchBtn.MouseEnter:Connect(function()
@@ -2303,7 +1868,7 @@ local function initialize()
 	clearSearchBtn.MouseButton1Click:Connect(function()
 		searchBox.Text = ""
 		State.searchQuery = ""
-		scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+		scanAndDisplayGuis(contentFrame, statusLabel)
 	end)
 
 	-- Close button (hides instead of destroying)
@@ -2389,7 +1954,7 @@ local function initialize()
 			State.frozenData = nil
 			freezeBtn.BackgroundColor3 = CONFIG.Colors.Button
 			freezeBtn.Text = "FREEZE ALL"
-			scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+			scanAndDisplayGuis(contentFrame, statusLabel)
 		end
 	end)
 
@@ -2408,12 +1973,12 @@ local function initialize()
 	-- Refresh button
 	refreshBtn.MouseButton1Click:Connect(function()
 		if not State.frozen then
-			scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+			scanAndDisplayGuis(contentFrame, statusLabel)
 		end
 	end)
 
 	-- Initial scan
-	scanAndDisplayGuis(contentFrame, statusLabel, screenGui)
+	scanAndDisplayGuis(contentFrame, statusLabel)
 end
 
 -- Start the tool

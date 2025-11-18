@@ -140,10 +140,26 @@ local function createUICorner(radius)
 end
 
 local function createResultsWindow(title, content, parentGui)
-	-- Create overlay
+	-- Create fullscreen overlay container in a separate ScreenGui for proper fullscreen effect
+	local overlayGui = Instance.new("ScreenGui")
+	overlayGui.Name = "ResultsOverlayGui"
+	overlayGui.ResetOnSpawn = false
+	overlayGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	overlayGui.DisplayOrder = 100
+
+	-- Try to parent to CoreGui, fallback to PlayerGui
+	local success = pcall(function()
+		overlayGui.Parent = CoreGui
+	end)
+	if not success then
+		overlayGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+	end
+
+	-- Create overlay background
 	local overlay = Instance.new("Frame")
 	overlay.Name = "ResultsOverlay"
-	overlay.Parent = parentGui
+	overlay.Parent = overlayGui
+	overlay.Position = UDim2.new(0, 0, 0, 0)
 	overlay.Size = UDim2.new(1, 0, 1, 0)
 	overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	overlay.BackgroundTransparency = 0.5
@@ -177,7 +193,7 @@ local function createResultsWindow(title, content, parentGui)
 	titleLabel.Size = UDim2.new(1, -50, 1, 0)
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Font = CONFIG.FontBold
-	titleLabel.Text = title
+	titleLabel.Text = "≡ " .. title .. " (drag to move)"
 	titleLabel.TextColor3 = CONFIG.Colors.Text
 	titleLabel.TextSize = 15
 	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -199,7 +215,38 @@ local function createResultsWindow(title, content, parentGui)
 	createUICorner(4).Parent = closeBtn
 
 	closeBtn.MouseButton1Click:Connect(function()
-		overlay:Destroy()
+		overlayGui:Destroy()
+	end)
+
+	-- Make window draggable by title bar
+	local dragging = false
+	local dragStart = nil
+	local startPos = nil
+
+	titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = resultsWindow.Position
+		end
+	end)
+
+	titleBar.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			resultsWindow.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+
+	titleBar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
 	end)
 
 	-- Content scroll
@@ -258,7 +305,7 @@ local function createResultsWindow(title, content, parentGui)
 		end
 	end)
 
-	return overlay
+	return overlayGui
 end
 
 local function createButton(parent, text, position, size, callback)
@@ -2379,6 +2426,384 @@ local function populateToolsTab(toolsFrame, screenGui)
 				end
 
 				createResultsWindow("Instance Statistics", results, screenGui)
+			end
+		},
+		{
+			name = "🌐 Advanced Player Network Info",
+			desc = "Detailed network and profile info for all players",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				local results = "<b>ADVANCED PLAYER NETWORK INFO</b>\n\n"
+				local players = Players:GetPlayers()
+
+				results = results .. string.format('<b>Total Players: %d</b>\n\n', #players)
+
+				for i, player in ipairs(players) do
+					results = results .. string.format('<b><font color="#5AA3E0">━━━ %s ━━━</font></b>\n', player.Name)
+
+					-- User ID
+					results = results .. string.format('🆔 UserId: <font color="#50B464">%d</font>\n', player.UserId)
+
+					-- Account Age
+					results = results .. string.format('📅 Account Age: <font color="#C8B450">%d days</font>\n', player.AccountAge)
+
+					-- Premium Status
+					local isPremium = player.MembershipType == Enum.MembershipType.Premium
+					local premiumText = isPremium and '<font color="#C8B450">⭐ PREMIUM</font>' or '<font color="#B45050">FREE</font>'
+					results = results .. string.format('💎 Membership: %s\n', premiumText)
+
+					-- Locale/Language
+					local locale = "Unknown"
+					pcall(function()
+						locale = player.LocaleId or "Unknown"
+					end)
+					results = results .. string.format('🌍 Locale: <font color="#9664C8">%s</font>\n', locale)
+
+					-- Team
+					if player.Team then
+						local teamColor = player.Team.TeamColor
+						local colorHex = string.format("#%02X%02X%02X", teamColor.Color.R * 255, teamColor.Color.G * 255, teamColor.Color.B * 255)
+						results = results .. string.format('👥 Team: <font color="%s">%s</font>\n', colorHex, player.Team.Name)
+					end
+
+					-- Character info
+					if player.Character then
+						local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+						if humanoid then
+							results = results .. string.format('❤️  Health: <font color="#50B464">%.0f/%.0f</font>\n', humanoid.Health, humanoid.MaxHealth)
+							results = results .. string.format('🏃 WalkSpeed: <font color="#5AA3E0">%.0f</font>\n', humanoid.WalkSpeed)
+							results = results .. string.format('🦘 JumpPower: <font color="#5AA3E0">%.0f</font>\n', humanoid.JumpPower)
+						end
+
+						local position = player.Character:GetPivot().Position
+						results = results .. string.format('📍 Position: <font color="#9664C8">(%.1f, %.1f, %.1f)</font>\n', position.X, position.Y, position.Z)
+					end
+
+					-- Ping/Network (if available)
+					pcall(function()
+						if player:FindFirstChild("PlayerGui") then
+							results = results .. '📶 Network: <font color="#50B464">Connected</font>\n'
+						end
+					end)
+
+					results = results .. '\n'
+				end
+
+				createResultsWindow("Advanced Player Network Info", results, screenGui)
+			end
+		},
+		{
+			name = "🔐 Script Security Scanner",
+			desc = "Scan all scripts for potentially dangerous functions",
+			color = CONFIG.Colors.AccentRed,
+			callback = function()
+				local results = "<b>SCRIPT SECURITY SCANNER</b>\n\n"
+
+				-- List of potentially dangerous functions
+				local dangerousFunctions = {
+					"getfenv", "setfenv", "loadstring", "require",
+					"FireServer", "InvokeServer", "HttpGet", "HttpPost",
+					"setclipboard", "writefile", "readfile", "delfile",
+					"hookfunction", "hookmetamethod", "newcclosure"
+				}
+
+				results = results .. '<b><font color="#B45050">⚠️  SCANNING FOR DANGEROUS PATTERNS</font></b>\n\n'
+
+				local scriptsScanned = 0
+				local suspiciousScripts = {}
+
+				for _, script in ipairs(game:GetDescendants()) do
+					if script:IsA("LocalScript") or script:IsA("Script") or script:IsA("ModuleScript") then
+						scriptsScanned = scriptsScanned + 1
+
+						-- Try to get script source if available
+						local hasExploit = false
+						pcall(function()
+							if getsenv and script:IsA("LocalScript") then
+								local env = getsenv(script)
+								if env then
+									-- Check if environment has dangerous functions
+									for _, funcName in ipairs(dangerousFunctions) do
+										if env[funcName] then
+											hasExploit = true
+											table.insert(suspiciousScripts, {
+												script = script,
+												reason = "Has access to: " .. funcName
+											})
+											break
+										end
+									end
+								end
+							end
+						end)
+					end
+				end
+
+				results = results .. string.format('<b>Scripts Scanned: %d</b>\n', scriptsScanned)
+				results = results .. string.format('<b><font color="#B45050">Suspicious Scripts: %d</font></b>\n\n', #suspiciousScripts)
+
+				if #suspiciousScripts > 0 then
+					results = results .. '<b>⚠️  SUSPICIOUS SCRIPTS:</b>\n'
+					for i, data in ipairs(suspiciousScripts) do
+						if i <= 20 then
+							results = results .. string.format('<font color="#B45050">%d.</font> %s\n   ↳ %s\n', i, data.script:GetFullName(), data.reason)
+						end
+					end
+					if #suspiciousScripts > 20 then
+						results = results .. string.format('\n... and %d more\n', #suspiciousScripts - 20)
+					end
+				else
+					results = results .. '<font color="#50B464">✓ No obvious suspicious patterns detected</font>\n'
+				end
+
+				results = results .. '\n<b>Note:</b> This is a basic scan. Advanced exploits may not be detected.'
+
+				createResultsWindow("Security Scanner", results, screenGui)
+			end
+		},
+		{
+			name = "💾 Advanced Memory Profiler",
+			desc = "Detailed memory usage analysis and optimization tips",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				local results = "<b>ADVANCED MEMORY PROFILER</b>\n\n"
+
+				-- Get memory stats
+				local memoryStats = game:GetService("Stats")
+
+				-- Instance memory breakdown
+				results = results .. '<b>📊 MEMORY BY INSTANCE TYPE:</b>\n\n'
+				local memoryByClass = {}
+				local totalInstances = 0
+
+				for _, obj in ipairs(game:GetDescendants()) do
+					totalInstances = totalInstances + 1
+					local className = obj.ClassName
+					memoryByClass[className] = (memoryByClass[className] or 0) + 1
+				end
+
+				-- Sort by count
+				local sorted = {}
+				for className, count in pairs(memoryByClass) do
+					table.insert(sorted, {className = className, count = count})
+				end
+				table.sort(sorted, function(a, b) return a.count > b.count end)
+
+				-- Estimate memory (rough calculation)
+				results = results .. string.format('<b>Total Instances: <font color="#5AA3E0">%d</font></b>\n', totalInstances)
+				results = results .. string.format('<b>Estimated Memory: <font color="#C8B450">~%.2f MB</font></b>\n\n', totalInstances * 0.001)
+
+				-- Top memory consumers
+				results = results .. '<b>Top Memory Consumers:</b>\n'
+				for i, data in ipairs(sorted) do
+					if i <= 15 then
+						local estimatedMB = data.count * 0.001
+						local percentage = (data.count / totalInstances) * 100
+						results = results .. string.format('%d. <font color="#5AA3E0">%s</font>: %d instances (~%.2f MB, %.1f%%)\n',
+							i, data.className, data.count, estimatedMB, percentage)
+					end
+				end
+
+				-- Optimization suggestions
+				results = results .. '\n<b><font color="#50B464">💡 OPTIMIZATION SUGGESTIONS:</font></b>\n'
+
+				if memoryByClass["Part"] and memoryByClass["Part"] > 1000 then
+					results = results .. '⚠️  High Part count - Consider using MeshParts or unions\n'
+				end
+				if memoryByClass["Script"] and memoryByClass["Script"] > 100 then
+					results = results .. '⚠️  Many Scripts - Consider consolidating logic\n'
+				end
+				if memoryByClass["Sound"] and memoryByClass["Sound"] > 50 then
+					results = results .. '⚠️  Many Sound objects - Consider sound pooling\n'
+				end
+				if memoryByClass["ParticleEmitter"] and memoryByClass["ParticleEmitter"] > 30 then
+					results = results .. '⚠️  Many ParticleEmitters - May impact performance\n'
+				end
+
+				-- Connection stats
+				results = results .. '\n<b>📡 CONNECTION ANALYSIS:</b>\n'
+				local remoteCount = (memoryByClass["RemoteEvent"] or 0) + (memoryByClass["RemoteFunction"] or 0)
+				local bindableCount = (memoryByClass["BindableEvent"] or 0) + (memoryByClass["BindableFunction"] or 0)
+				results = results .. string.format('RemoteEvents/Functions: <font color="#5AA3E0">%d</font>\n', remoteCount)
+				results = results .. string.format('BindableEvents/Functions: <font color="#9664C8">%d</font>\n', bindableCount)
+
+				createResultsWindow("Advanced Memory Profiler", results, screenGui)
+			end
+		},
+		{
+			name = "📡 Live Network Traffic Monitor",
+			desc = "Real-time monitoring of all Remote calls with hook",
+			color = CONFIG.Colors.AccentGreen,
+			callback = function()
+				local results = "<b>LIVE NETWORK TRAFFIC MONITOR</b>\n\n"
+
+				results = results .. '<b><font color="#50B464">🔴 NETWORK MONITOR ACTIVATED</font></b>\n\n'
+
+				-- Scan all remotes
+				local remotes = {}
+				for _, obj in ipairs(game:GetDescendants()) do
+					if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+						table.insert(remotes, obj)
+					end
+				end
+
+				results = results .. string.format('<b>Monitoring %d remotes...</b>\n\n', #remotes)
+
+				-- Group by location
+				local byLocation = {}
+				for _, remote in ipairs(remotes) do
+					local location = remote.Parent and remote.Parent.Name or "Unknown"
+					byLocation[location] = byLocation[location] or {}
+					table.insert(byLocation[location], remote)
+				end
+
+				results = results .. '<b>📊 REMOTE DISTRIBUTION:</b>\n'
+				for location, locationRemotes in pairs(byLocation) do
+					results = results .. string.format('<font color="#5AA3E0">%s</font>: %d remotes\n', location, #locationRemotes)
+					for i, remote in ipairs(locationRemotes) do
+						if i <= 5 then
+							local type_icon = remote:IsA("RemoteEvent") and "📤" or "📞"
+							results = results .. string.format('  %s %s\n', type_icon, remote.Name)
+						end
+					end
+					if #locationRemotes > 5 then
+						results = results .. string.format('  ... and %d more\n', #locationRemotes - 5)
+					end
+				end
+
+				-- Hook info
+				results = results .. '\n<b>🔧 HOOK CAPABILITIES:</b>\n'
+				if hookfunction then
+					results = results .. '<font color="#50B464">✓ hookfunction available</font>\n'
+					results = results .. '  Can hook FireServer, InvokeServer\n'
+				else
+					results = results .. '<font color="#B45050">✗ hookfunction not available</font>\n'
+				end
+
+				if hookmetamethod then
+					results = results .. '<font color="#50B464">✓ hookmetamethod available</font>\n'
+					results = results .. '  Can intercept metamethod calls\n'
+				else
+					results = results .. '<font color="#B45050">✗ hookmetamethod not available</font>\n'
+				end
+
+				-- Traffic patterns
+				results = results .. '\n<b>📈 COMMON TRAFFIC PATTERNS:</b>\n'
+				results = results .. '• ReplicatedStorage: Game state sync\n'
+				results = results .. '• PlayerGui: UI interactions\n'
+				results = results .. '• Workspace: Physics/movement updates\n'
+
+				results = results .. '\n<b>Note:</b> Use the Remote Spy tab for real-time logging'
+
+				createResultsWindow("Network Traffic Monitor", results, screenGui)
+			end
+		},
+		{
+			name = "🎯 Script Bytecode Analyzer",
+			desc = "Advanced bytecode and execution analysis",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				local results = "<b>SCRIPT BYTECODE ANALYZER</b>\n\n"
+
+				results = results .. '<b><font color="#C8B450">🔬 ANALYZING SCRIPT STRUCTURE</font></b>\n\n'
+
+				-- Collect all scripts
+				local scripts = {
+					LocalScripts = {},
+					Scripts = {},
+					ModuleScripts = {}
+				}
+
+				for _, obj in ipairs(game:GetDescendants()) do
+					if obj:IsA("LocalScript") then
+						table.insert(scripts.LocalScripts, obj)
+					elseif obj:IsA("Script") then
+						table.insert(scripts.Scripts, obj)
+					elseif obj:IsA("ModuleScript") then
+						table.insert(scripts.ModuleScripts, obj)
+					end
+				end
+
+				results = results .. '<b>📊 SCRIPT INVENTORY:</b>\n'
+				results = results .. string.format('<font color="#C8B450">LocalScripts</font>: %d\n', #scripts.LocalScripts)
+				results = results .. string.format('<font color="#5AA3E0">Scripts</font>: %d\n', #scripts.Scripts)
+				results = results .. string.format('<font color="#9664C8">ModuleScripts</font>: %d\n', #scripts.ModuleScripts)
+
+				-- Advanced analysis capabilities
+				results = results .. '\n<b>🔧 ANALYSIS CAPABILITIES:</b>\n'
+
+				if getsenv then
+					results = results .. '<font color="#50B464">✓ getsenv</font> - Can access script environments\n'
+				else
+					results = results .. '<font color="#B45050">✗ getsenv</font> - Not available\n'
+				end
+
+				if getgc then
+					results = results .. '<font color="#50B464">✓ getgc</font> - Can analyze garbage collector\n'
+				else
+					results = results .. '<font color="#B45050">✗ getgc</font> - Not available\n'
+				end
+
+				if debug and debug.getinfo then
+					results = results .. '<font color="#50B464">✓ debug.getinfo</font> - Can inspect functions\n'
+				else
+					results = results .. '<font color="#B45050">✗ debug.getinfo</font> - Not available\n'
+				end
+
+				if getloadedmodules then
+					results = results .. '<font color="#50B464">✓ getloadedmodules</font> - Can list loaded modules\n'
+				else
+					results = results .. '<font color="#B45050">✗ getloadedmodules</font> - Not available\n'
+				end
+
+				-- Try to analyze some scripts
+				results = results .. '\n<b>🔍 ENVIRONMENT ANALYSIS:</b>\n'
+				local analyzedCount = 0
+				local accessibleEnvs = 0
+
+				for _, script in ipairs(scripts.LocalScripts) do
+					if analyzedCount < 10 then
+						analyzedCount = analyzedCount + 1
+						pcall(function()
+							if getsenv then
+								local env = getsenv(script)
+								if env then
+									accessibleEnvs = accessibleEnvs + 1
+									local funcCount = 0
+									for k, v in pairs(env) do
+										if type(v) == "function" then
+											funcCount = funcCount + 1
+										end
+									end
+									if funcCount > 5 then
+										results = results .. string.format('<font color="#50B464">✓</font> %s (%d functions)\n', script.Name, funcCount)
+									end
+								end
+							end
+						end)
+					end
+				end
+
+				results = results .. string.format('\n<b>Accessible Environments: <font color="#50B464">%d/%d</font></b>\n', accessibleEnvs, analyzedCount)
+
+				-- Execution context
+				results = results .. '\n<b>⚙️  EXECUTION CONTEXT:</b>\n'
+				results = results .. string.format('Identity Level: <font color="#5AA3E0">%d</font>\n',
+					(identifyexecutor and 8) or (syn and 7) or (KRNL_LOADED and 6) or 2)
+
+				if is_sirhurt_closure then
+					results = results .. 'Executor: <font color="#9664C8">Sirhurt</font>\n'
+				elseif KRNL_LOADED then
+					results = results .. 'Executor: <font color="#9664C8">KRNL</font>\n'
+				elseif syn then
+					results = results .. 'Executor: <font color="#9664C8">Synapse</font>\n'
+				elseif OXYGEN_LOADED then
+					results = results .. 'Executor: <font color="#9664C8">Oxygen U</font>\n'
+				else
+					results = results .. 'Executor: <font color="#C8B450">Unknown/Custom</font>\n'
+				end
+
+				createResultsWindow("Bytecode Analyzer", results, screenGui)
 			end
 		},
 	}

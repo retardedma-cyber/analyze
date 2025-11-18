@@ -433,11 +433,59 @@ local function createMainWindow()
 	listLayout.Padding = UDim.new(0, 2)
 
 	-- Content frames for each tab
+	-- Remotes tab header
+	local remotesHeader = Instance.new("Frame")
+	remotesHeader.Name = "RemotesHeader"
+	remotesHeader.Parent = mainFrame
+	remotesHeader.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	remotesHeader.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 0, 40)
+	remotesHeader.BackgroundColor3 = CONFIG.Colors.TopBar
+	remotesHeader.BorderSizePixel = 0
+	remotesHeader.Visible = false
+	createUICorner(4).Parent = remotesHeader
+
+	local remotesTitle = Instance.new("TextLabel")
+	remotesTitle.Parent = remotesHeader
+	remotesTitle.Position = UDim2.new(0, 10, 0, 0)
+	remotesTitle.Size = UDim2.new(0, 300, 1, 0)
+	remotesTitle.BackgroundTransparency = 1
+	remotesTitle.Font = CONFIG.FontBold
+	remotesTitle.Text = "Remote Spy"
+	remotesTitle.TextColor3 = CONFIG.Colors.Text
+	remotesTitle.TextSize = 14
+	remotesTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+	local remotesStatus = Instance.new("TextLabel")
+	remotesStatus.Name = "RemotesStatus"
+	remotesStatus.Parent = remotesHeader
+	remotesStatus.Position = UDim2.new(0, 120, 0, 0)
+	remotesStatus.Size = UDim2.new(1, -250, 1, 0)
+	remotesStatus.BackgroundTransparency = 1
+	remotesStatus.Font = CONFIG.Font
+	remotesStatus.Text = "Initializing..."
+	remotesStatus.TextColor3 = CONFIG.Colors.TextDim
+	remotesStatus.TextSize = 11
+	remotesStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+	local refreshRemotesBtn = Instance.new("TextButton")
+	refreshRemotesBtn.Name = "RefreshRemotesBtn"
+	refreshRemotesBtn.Parent = remotesHeader
+	refreshRemotesBtn.Position = UDim2.new(1, -110, 0.5, -15)
+	refreshRemotesBtn.Size = UDim2.new(0, 100, 0, 30)
+	refreshRemotesBtn.BackgroundColor3 = CONFIG.Colors.AccentBlue
+	refreshRemotesBtn.BorderSizePixel = 0
+	refreshRemotesBtn.Font = CONFIG.FontBold
+	refreshRemotesBtn.Text = "REFRESH"
+	refreshRemotesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	refreshRemotesBtn.TextSize = 12
+	refreshRemotesBtn.AutoButtonColor = false
+	createUICorner(4).Parent = refreshRemotesBtn
+
 	local remotesFrame = Instance.new("ScrollingFrame")
 	remotesFrame.Name = "RemotesFrame"
 	remotesFrame.Parent = mainFrame
-	remotesFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
-	remotesFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	remotesFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 96)
+	remotesFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -106)
 	remotesFrame.BackgroundColor3 = CONFIG.Colors.Background
 	remotesFrame.BorderSizePixel = 0
 	remotesFrame.ScrollBarThickness = 6
@@ -478,7 +526,7 @@ local function createMainWindow()
 	settingsFrame.BorderSizePixel = 0
 	settingsFrame.Visible = false
 
-	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame
+	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn
 end
 
 -- ========================
@@ -763,14 +811,14 @@ local function createGuiEntry(parent, obj, depth, onRefresh)
 
 		moreMenu = Instance.new("Frame")
 		moreMenu.Name = "MoreMenu"
-		moreMenu.Parent = entry
-		moreMenu.Position = UDim2.new(1, -180, 0, 28)
+		moreMenu.Parent = screenGui or entry.Parent.Parent.Parent  -- Parent to screenGui for proper z-index
+		moreMenu.Position = UDim2.new(0, moreBtn.AbsolutePosition.X - 150, 0, moreBtn.AbsolutePosition.Y + 30)
 		moreMenu.Size = UDim2.new(0, 170, 0, 0)
 		moreMenu.BackgroundColor3 = CONFIG.Colors.TopBar
 		moreMenu.BorderSizePixel = 1
 		moreMenu.BorderColor3 = CONFIG.Colors.Border
 		moreMenu.AutomaticSize = Enum.AutomaticSize.Y
-		moreMenu.ZIndex = 100
+		moreMenu.ZIndex = 1000
 		createUICorner(4).Parent = moreMenu
 
 		local menuLayout = Instance.new("UIListLayout")
@@ -1224,6 +1272,74 @@ local function populateToolsTab(toolsFrame)
 				print("Console cleared")
 			end
 		},
+		{
+			name = "Get Connections",
+			desc = "List all connections of selected GUI (requires getcallbacks)",
+			color = CONFIG.Colors.AccentGreen,
+			callback = function()
+				print("=== GET CONNECTIONS ===")
+				if getconnections then
+					print("Feature available - select a GUI and use '...' menu")
+					print("This shows event connections like MouseButton1Click, etc.")
+				else
+					print("getconnections not supported by exploit")
+				end
+				print("=======================")
+			end
+		},
+		{
+			name = "Dump ModuleScripts",
+			desc = "Find and list all ModuleScripts",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				print("=== MODULE SCRIPTS ===")
+				local count = 0
+				for _, desc in ipairs(game:GetDescendants()) do
+					if desc:IsA("ModuleScript") then
+						print("ModuleScript ->", desc:GetFullName())
+						count = count + 1
+					end
+				end
+				print("Total found:", count)
+				print("======================")
+			end
+		},
+		{
+			name = "Find BindableEvents",
+			desc = "Locate all BindableEvents and BindableFunctions",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				print("=== BINDABLE EVENTS ===")
+				local count = 0
+				for _, desc in ipairs(game:GetDescendants()) do
+					if desc:IsA("BindableEvent") or desc:IsA("BindableFunction") then
+						print(desc.ClassName, "->", desc:GetFullName())
+						count = count + 1
+					end
+				end
+				print("Total found:", count)
+				print("=======================")
+			end
+		},
+		{
+			name = "Workspace Info",
+			desc = "Get detailed workspace information",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				print("=== WORKSPACE INFO ===")
+				local workspace = game:GetService("Workspace")
+				print("Camera:", workspace.CurrentCamera)
+				print("Gravity:", workspace.Gravity)
+				print("Parts count:", #workspace:GetDescendants())
+				print("Models:")
+				for _, obj in ipairs(workspace:GetChildren()) do
+					if obj:IsA("Model") then
+						print("  -", obj.Name, "| PrimaryPart:", obj.PrimaryPart)
+					end
+				end
+				print("======================")
+			end
+		},
 	}
 
 	for i, tool in ipairs(tools) do
@@ -1292,21 +1408,179 @@ local function populateToolsTab(toolsFrame)
 	end
 end
 
+local function populateSettingsTab(settingsFrame)
+	local settingsList = Instance.new("ScrollingFrame")
+	settingsList.Parent = settingsFrame
+	settingsList.Size = UDim2.new(1, 0, 1, 0)
+	settingsList.BackgroundTransparency = 1
+	settingsList.BorderSizePixel = 0
+	settingsList.ScrollBarThickness = 6
+	settingsList.ScrollBarImageColor3 = CONFIG.Colors.Border
+	settingsList.CanvasSize = UDim2.new(0, 0, 0, 0)
+	settingsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+	local settingsLayout = Instance.new("UIListLayout")
+	settingsLayout.Parent = settingsList
+	settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	settingsLayout.Padding = UDim.new(0, 10)
+
+	local settingsOptions = {
+		{
+			name = "Remote Spy",
+			desc = "Monitor RemoteEvent and RemoteFunction calls",
+			type = "toggle",
+			default = true,
+			key = "remoteSpyEnabled"
+		},
+		{
+			name = "Show Clipboard Notifications",
+			desc = "Show notifications when copying to clipboard",
+			type = "toggle",
+			default = true,
+			key = "showClipboardNotif"
+		},
+		{
+			name = "Debug Output",
+			desc = "Print debug information to console",
+			type = "toggle",
+			default = true,
+			key = "debugOutput"
+		}
+	}
+
+	for i, setting in ipairs(settingsOptions) do
+		local settingCard = Instance.new("Frame")
+		settingCard.Name = "Setting_" .. i
+		settingCard.Parent = settingsList
+		settingCard.Size = UDim2.new(1, -20, 0, 60)
+		settingCard.BackgroundColor3 = CONFIG.Colors.Button
+		settingCard.BorderSizePixel = 0
+		settingCard.LayoutOrder = i
+		createUICorner(6).Parent = settingCard
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Parent = settingCard
+		nameLabel.Position = UDim2.new(0, 15, 0, 8)
+		nameLabel.Size = UDim2.new(1, -120, 0, 20)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Font = CONFIG.FontBold
+		nameLabel.Text = setting.name
+		nameLabel.TextColor3 = CONFIG.Colors.Text
+		nameLabel.TextSize = 14
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		local descLabel = Instance.new("TextLabel")
+		descLabel.Parent = settingCard
+		descLabel.Position = UDim2.new(0, 15, 0, 30)
+		descLabel.Size = UDim2.new(1, -120, 0, 20)
+		descLabel.BackgroundTransparency = 1
+		descLabel.Font = CONFIG.Font
+		descLabel.Text = setting.desc
+		descLabel.TextColor3 = CONFIG.Colors.TextDim
+		descLabel.TextSize = 11
+		descLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		-- Toggle button
+		local toggleBtn = Instance.new("TextButton")
+		toggleBtn.Parent = settingCard
+		toggleBtn.Position = UDim2.new(1, -90, 0.5, -15)
+		toggleBtn.Size = UDim2.new(0, 80, 0, 30)
+		toggleBtn.BackgroundColor3 = setting.default and CONFIG.Colors.AccentGreen or CONFIG.Colors.AccentRed
+		toggleBtn.BorderSizePixel = 0
+		toggleBtn.Font = CONFIG.FontBold
+		toggleBtn.Text = setting.default and "ON" or "OFF"
+		toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		toggleBtn.TextSize = 13
+		toggleBtn.AutoButtonColor = false
+		createUICorner(4).Parent = toggleBtn
+
+		State[setting.key] = setting.default
+
+		toggleBtn.MouseButton1Click:Connect(function()
+			State[setting.key] = not State[setting.key]
+			toggleBtn.BackgroundColor3 = State[setting.key] and CONFIG.Colors.AccentGreen or CONFIG.Colors.AccentRed
+			toggleBtn.Text = State[setting.key] and "ON" or "OFF"
+			print("Setting changed:", setting.name, "=", State[setting.key])
+		end)
+	end
+
+	-- Info section
+	local infoCard = Instance.new("Frame")
+	infoCard.Name = "Info"
+	infoCard.Parent = settingsList
+	infoCard.Size = UDim2.new(1, -20, 0, 120)
+	infoCard.BackgroundColor3 = CONFIG.Colors.TopBar
+	infoCard.BorderSizePixel = 0
+	infoCard.LayoutOrder = 100
+	createUICorner(6).Parent = infoCard
+
+	local infoTitle = Instance.new("TextLabel")
+	infoTitle.Parent = infoCard
+	infoTitle.Position = UDim2.new(0, 15, 0, 10)
+	infoTitle.Size = UDim2.new(1, -30, 0, 20)
+	infoTitle.BackgroundTransparency = 1
+	infoTitle.Font = CONFIG.FontBold
+	infoTitle.Text = "GUI Debug Tool v1.0"
+	infoTitle.TextColor3 = CONFIG.Colors.AccentBlue
+	infoTitle.TextSize = 16
+	infoTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+	local infoText = Instance.new("TextLabel")
+	infoText.Parent = infoCard
+	infoText.Position = UDim2.new(0, 15, 0, 35)
+	infoText.Size = UDim2.new(1, -30, 0, 75)
+	infoText.BackgroundTransparency = 1
+	infoText.Font = CONFIG.Font
+	infoText.Text = "Professional GUI Inspector & Debugger\nReverse Engineering Tools\nRemote Spy • Script Scanner • Chat Monitor"
+	infoText.TextColor3 = CONFIG.Colors.TextDim
+	infoText.TextSize = 12
+	infoText.TextXAlignment = Enum.TextXAlignment.Left
+	infoText.TextYAlignment = Enum.TextYAlignment.Top
+	infoText.TextWrapped = true
+end
+
 local function initialize()
-	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame = createMainWindow()
+	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn = createMainWindow()
 
 	-- Store reference for show/hide functions
 	debugToolInstance = screenGui
 
 	-- Setup Remote Spy
+	local remoteSpyActive = false
 	pcall(function()
-		if hookmetamethod then
+		if hookmetamethod and getnamecallmethod then
 			setupRemoteSpy(remotesFrame)
+			remoteSpyActive = true
+			remotesStatus.Text = "Active | " .. #State.remoteLogs .. " logs"
+			remotesStatus.TextColor3 = CONFIG.Colors.AccentGreen
+		else
+			remotesStatus.Text = "Not supported (hookmetamethod unavailable)"
+			remotesStatus.TextColor3 = CONFIG.Colors.AccentRed
 		end
+	end)
+
+	if not remoteSpyActive then
+		remotesStatus.Text = "Not supported (exploit limitation)"
+		remotesStatus.TextColor3 = CONFIG.Colors.AccentRed
+	end
+
+	-- Refresh remotes button
+	refreshRemotesBtn.MouseEnter:Connect(function()
+		refreshRemotesBtn.BackgroundColor3 = Color3.fromRGB(90, 150, 200)
+	end)
+	refreshRemotesBtn.MouseLeave:Connect(function()
+		refreshRemotesBtn.BackgroundColor3 = CONFIG.Colors.AccentBlue
+	end)
+	refreshRemotesBtn.MouseButton1Click:Connect(function()
+		refreshRemotesList(remotesFrame)
+		remotesStatus.Text = "Active | " .. #State.remoteLogs .. " logs"
 	end)
 
 	-- Populate Tools tab
 	populateToolsTab(toolsFrame)
+
+	-- Populate Settings tab
+	populateSettingsTab(settingsFrame)
 
 	-- Tab switching logic
 	local function switchTab(tabName)
@@ -1321,11 +1595,13 @@ local function initialize()
 		contentFrame.Visible = (tabName == "GUIs")
 		toolbar.Visible = (tabName == "GUIs")
 		remotesFrame.Visible = (tabName == "Remotes")
+		remotesHeader.Visible = (tabName == "Remotes")
 		toolsFrame.Visible = (tabName == "Tools")
 		settingsFrame.Visible = (tabName == "Settings")
 
 		if tabName == "Remotes" then
 			refreshRemotesList(remotesFrame)
+			remotesStatus.Text = "Active | " .. #State.remoteLogs .. " logs"
 		end
 	end
 
@@ -1376,17 +1652,40 @@ local function initialize()
 	-- Minimize button
 	local isMinimized = false
 	local originalSize = mainFrame.Size
+	local sidebar = mainFrame:FindFirstChild("Sidebar")
+	local sidebarSeparator = mainFrame:FindFirstChild("SidebarSeparator")
+
 	minimizeBtn.MouseButton1Click:Connect(function()
 		if isMinimized then
 			mainFrame.Size = originalSize
-			contentFrame.Visible = true
-			mainFrame:FindFirstChild("Toolbar").Visible = true
+			if sidebar then sidebar.Visible = true end
+			if sidebarSeparator then sidebarSeparator.Visible = true end
+
+			-- Show current tab content
+			if State.currentTab == "GUIs" then
+				contentFrame.Visible = true
+				toolbar.Visible = true
+			elseif State.currentTab == "Remotes" then
+				remotesFrame.Visible = true
+				remotesHeader.Visible = true
+			elseif State.currentTab == "Tools" then
+				toolsFrame.Visible = true
+			elseif State.currentTab == "Settings" then
+				settingsFrame.Visible = true
+			end
+
 			minimizeBtn.Text = "−"
 			isMinimized = false
 		else
 			mainFrame.Size = UDim2.new(0, CONFIG.WindowSize.X, 0, 35)
+			if sidebar then sidebar.Visible = false end
+			if sidebarSeparator then sidebarSeparator.Visible = false end
 			contentFrame.Visible = false
-			mainFrame:FindFirstChild("Toolbar").Visible = false
+			toolbar.Visible = false
+			remotesFrame.Visible = false
+			remotesHeader.Visible = false
+			toolsFrame.Visible = false
+			settingsFrame.Visible = false
 			minimizeBtn.Text = "□"
 			isMinimized = true
 		end

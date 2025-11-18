@@ -312,6 +312,7 @@ local function createMainWindow()
 		{name = "GUIs", icon = "G"},
 		{name = "Remotes", icon = "R"},
 		{name = "Tools", icon = "T"},
+		{name = "Chat", icon = "C"},
 		{name = "Settings", icon = "S"}
 	}
 
@@ -526,7 +527,73 @@ local function createMainWindow()
 	settingsFrame.BorderSizePixel = 0
 	settingsFrame.Visible = false
 
-	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn
+	-- Chat Frame
+	local chatFrame = Instance.new("Frame")
+	chatFrame.Name = "ChatFrame"
+	chatFrame.Parent = mainFrame
+	chatFrame.Position = UDim2.new(0, CONFIG.SidebarWidth + 11, 0, 46)
+	chatFrame.Size = UDim2.new(1, -(CONFIG.SidebarWidth + 21), 1, -56)
+	chatFrame.BackgroundColor3 = CONFIG.Colors.Background
+	chatFrame.BorderSizePixel = 0
+	chatFrame.Visible = false
+
+	-- Chat messages scroll
+	local chatScroll = Instance.new("ScrollingFrame")
+	chatScroll.Name = "ChatScroll"
+	chatScroll.Parent = chatFrame
+	chatScroll.Position = UDim2.new(0, 5, 0, 5)
+	chatScroll.Size = UDim2.new(1, -10, 1, -50)
+	chatScroll.BackgroundColor3 = CONFIG.Colors.Button
+	chatScroll.BorderSizePixel = 0
+	chatScroll.ScrollBarThickness = 6
+	chatScroll.ScrollBarImageColor3 = CONFIG.Colors.Border
+	chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	createUICorner(6).Parent = chatScroll
+
+	local chatLayout = Instance.new("UIListLayout")
+	chatLayout.Parent = chatScroll
+	chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	chatLayout.Padding = UDim.new(0, 3)
+
+	-- Chat input box
+	local chatInputBox = Instance.new("TextBox")
+	chatInputBox.Name = "ChatInputBox"
+	chatInputBox.Parent = chatFrame
+	chatInputBox.Position = UDim2.new(0, 5, 1, -40)
+	chatInputBox.Size = UDim2.new(1, -95, 0, 35)
+	chatInputBox.BackgroundColor3 = CONFIG.Colors.Button
+	chatInputBox.BorderSizePixel = 0
+	chatInputBox.Font = CONFIG.Font
+	chatInputBox.PlaceholderText = "Type message... (Enter to send)"
+	chatInputBox.Text = ""
+	chatInputBox.TextColor3 = CONFIG.Colors.Text
+	chatInputBox.PlaceholderColor3 = CONFIG.Colors.TextDim
+	chatInputBox.TextSize = 13
+	chatInputBox.TextXAlignment = Enum.TextXAlignment.Left
+	chatInputBox.ClearTextOnFocus = false
+	createUICorner(4).Parent = chatInputBox
+
+	local chatPadding = Instance.new("UIPadding")
+	chatPadding.Parent = chatInputBox
+	chatPadding.PaddingLeft = UDim.new(0, 8)
+
+	-- Send button
+	local sendBtn = Instance.new("TextButton")
+	sendBtn.Name = "SendButton"
+	sendBtn.Parent = chatFrame
+	sendBtn.Position = UDim2.new(1, -85, 1, -40)
+	sendBtn.Size = UDim2.new(0, 80, 0, 35)
+	sendBtn.BackgroundColor3 = CONFIG.Colors.AccentGreen
+	sendBtn.BorderSizePixel = 0
+	sendBtn.Font = CONFIG.FontBold
+	sendBtn.Text = "SEND"
+	sendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	sendBtn.TextSize = 13
+	sendBtn.AutoButtonColor = false
+	createUICorner(4).Parent = sendBtn
+
+	return screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn
 end
 
 -- ========================
@@ -1539,8 +1606,133 @@ local function populateSettingsTab(settingsFrame)
 	infoText.TextWrapped = true
 end
 
+-- ========================
+-- CHAT SPY
+-- ========================
+
+local function setupChatSpy(chatScroll)
+	local StarterGui = game:GetService("StarterGui")
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+	local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+
+	if not chatEvents then
+		print("[CHAT SPY] Chat system not found")
+		return false
+	end
+
+	local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
+	local getmsg = chatEvents:FindFirstChild("OnMessageDoneFiltering")
+
+	if not saymsg or not getmsg then
+		print("[CHAT SPY] Chat events not found")
+		return false
+	end
+
+	-- Color function for players
+	local function getPlayerColor(playerName)
+		local hash = 0
+		for i = 1, #playerName do
+			hash = hash + string.byte(playerName, i)
+		end
+		local colors = {
+			Color3.fromRGB(255, 85, 85),   -- Red
+			Color3.fromRGB(85, 170, 255),  -- Blue
+			Color3.fromRGB(85, 255, 85),   -- Green
+			Color3.fromRGB(255, 170, 0),   -- Orange
+			Color3.fromRGB(170, 85, 255),  -- Purple
+			Color3.fromRGB(255, 255, 85),  -- Yellow
+			Color3.fromRGB(85, 255, 255),  -- Cyan
+			Color3.fromRGB(255, 85, 255),  -- Magenta
+		}
+		return colors[(hash % #colors) + 1]
+	end
+
+	-- Add message to chat
+	local function addChatMessage(playerName, message, isPrivate)
+		local msgFrame = Instance.new("Frame")
+		msgFrame.Name = "ChatMessage"
+		msgFrame.Parent = chatScroll
+		msgFrame.Size = UDim2.new(1, -10, 0, 0)
+		msgFrame.BackgroundTransparency = 1
+		msgFrame.AutomaticSize = Enum.AutomaticSize.Y
+		msgFrame.LayoutOrder = #chatScroll:GetChildren()
+
+		local msgText = Instance.new("TextLabel")
+		msgText.Parent = msgFrame
+		msgText.Size = UDim2.new(1, 0, 0, 0)
+		msgText.BackgroundTransparency = 1
+		msgText.Font = CONFIG.Font
+		msgText.TextColor3 = CONFIG.Colors.Text
+		msgText.TextSize = 13
+		msgText.TextXAlignment = Enum.TextXAlignment.Left
+		msgText.TextYAlignment = Enum.TextYAlignment.Top
+		msgText.TextWrapped = true
+		msgText.AutomaticSize = Enum.AutomaticSize.Y
+		msgText.RichText = true
+
+		local playerColor = getPlayerColor(playerName)
+		local prefix = isPrivate and "[SPY] " or ""
+		local colorHex = string.format("#%02X%02X%02X", playerColor.R * 255, playerColor.G * 255, playerColor.B * 255)
+
+		msgText.Text = string.format('%s<font color="%s"><b>%s</b></font>: %s', prefix, colorHex, playerName, message)
+
+		-- Auto scroll to bottom
+		chatScroll.CanvasPosition = Vector2.new(0, chatScroll.AbsoluteCanvasSize.Y)
+	end
+
+	-- Monitor chat
+	local function onChatted(p, msg)
+		msg = msg:gsub("[\n\r]",''):gsub("\t",' '):gsub("[ ]+",' ')
+		local hidden = true
+
+		local conn = getmsg.OnClientEvent:Connect(function(packet, channel)
+			if packet.SpeakerUserId == p.UserId and packet.Message == msg:sub(#msg-#packet.Message+1) then
+				if channel == "All" or (channel == "Team" and Players[packet.FromSpeaker].Team == player.Team) then
+					hidden = false
+				end
+			end
+		end)
+
+		wait(1)
+		conn:Disconnect()
+
+		if hidden then
+			-- This is a private message
+			addChatMessage(p.Name, msg, true)
+		end
+	end
+
+	-- Connect to all players
+	for _, p in ipairs(Players:GetPlayers()) do
+		p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+	end
+
+	Players.PlayerAdded:Connect(function(p)
+		p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+		addChatMessage("SYSTEM", p.Name .. " joined the game", false)
+	end)
+
+	Players.PlayerRemoving:Connect(function(p)
+		addChatMessage("SYSTEM", p.Name .. " left the game", false)
+	end)
+
+	-- Monitor public messages too
+	getmsg.OnClientEvent:Connect(function(packet, channel)
+		if packet.SpeakerUserId ~= player.UserId then
+			local senderPlayer = Players:GetPlayerByUserId(packet.SpeakerUserId)
+			if senderPlayer then
+				addChatMessage(senderPlayer.Name, packet.Message, false)
+			end
+		end
+	end)
+
+	print("[CHAT SPY] Enabled successfully")
+	return true
+end
+
 local function initialize()
-	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn = createMainWindow()
+	local screenGui, mainFrame, contentFrame, freezeBtn, refreshBtn, minimizeBtn, closeBtn, statusLabel, searchBox, clearSearchBtn, tabButtons, toolbar, remotesFrame, toolsFrame, settingsFrame, remotesHeader, remotesStatus, refreshRemotesBtn, chatFrame, chatScroll, chatInputBox, sendBtn = createMainWindow()
 
 	-- Store reference for show/hide functions
 	debugToolInstance = screenGui
@@ -1582,6 +1774,40 @@ local function initialize()
 	-- Populate Settings tab
 	populateSettingsTab(settingsFrame)
 
+	-- Setup Chat Spy
+	local chatSpyActive = pcall(function()
+		return setupChatSpy(chatScroll)
+	end)
+
+	-- Chat send functionality
+	local function sendChatMessage()
+		local message = chatInputBox.Text
+		if message and message ~= "" then
+			local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+			if chatEvents then
+				local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
+				if saymsg then
+					saymsg:FireServer(message, "All")
+					chatInputBox.Text = ""
+				end
+			end
+		end
+	end
+
+	sendBtn.MouseEnter:Connect(function()
+		sendBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 120)
+	end)
+	sendBtn.MouseLeave:Connect(function()
+		sendBtn.BackgroundColor3 = CONFIG.Colors.AccentGreen
+	end)
+	sendBtn.MouseButton1Click:Connect(sendChatMessage)
+
+	chatInputBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			sendChatMessage()
+		end
+	end)
+
 	-- Tab switching logic
 	local function switchTab(tabName)
 		State.currentTab = tabName
@@ -1597,6 +1823,7 @@ local function initialize()
 		remotesFrame.Visible = (tabName == "Remotes")
 		remotesHeader.Visible = (tabName == "Remotes")
 		toolsFrame.Visible = (tabName == "Tools")
+		chatFrame.Visible = (tabName == "Chat")
 		settingsFrame.Visible = (tabName == "Settings")
 
 		if tabName == "Remotes" then
@@ -1670,6 +1897,8 @@ local function initialize()
 				remotesHeader.Visible = true
 			elseif State.currentTab == "Tools" then
 				toolsFrame.Visible = true
+			elseif State.currentTab == "Chat" then
+				chatFrame.Visible = true
 			elseif State.currentTab == "Settings" then
 				settingsFrame.Visible = true
 			end
@@ -1685,6 +1914,7 @@ local function initialize()
 			remotesFrame.Visible = false
 			remotesHeader.Visible = false
 			toolsFrame.Visible = false
+			chatFrame.Visible = false
 			settingsFrame.Visible = false
 			minimizeBtn.Text = "□"
 			isMinimized = true

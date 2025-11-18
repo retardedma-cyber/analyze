@@ -2622,6 +2622,775 @@ local function populateToolsTab(toolsFrame, screenGui)
 				createResultsWindow("Workspace Inspector", results, screenGui)
 			end
 		},
+
+		-- ═══════════════════════════════════════════
+		-- ⚡ ПРОДВИНУТАЯ ЭКСПЛУАТАЦИЯ (ADVANCED EXPLOITATION)
+		-- ═══════════════════════════════════════════
+		{
+			name = "🔬 Metatable Deep Analyzer",
+			desc = "Advanced metatable and metamethod analysis",
+			color = CONFIG.Colors.AccentRed,
+			callback = function()
+				local results = "<b>METATABLE DEEP ANALYZER</b>\n\n"
+				results = results .. '<b><font color="#B45050">⚡ ADVANCED METAPROGRAMMING ANALYSIS</font></b>\n\n'
+
+				local analyzed = {}
+				local metatableCount = 0
+				local metamethodStats = {}
+
+				-- Analyze common metamethods
+				local metamethods = {
+					"__index", "__newindex", "__call", "__tostring", "__metatable",
+					"__mode", "__gc", "__len", "__unm", "__add", "__sub", "__mul",
+					"__div", "__mod", "__pow", "__concat", "__eq", "__lt", "__le",
+					"__namecall"
+				}
+
+				-- Scan game for metatables
+				for _, obj in ipairs(game:GetDescendants()) do
+					pcall(function()
+						local mt = getrawmetatable(obj)
+						if mt and not analyzed[mt] then
+							analyzed[mt] = true
+							metatableCount = metatableCount + 1
+
+							for _, method in ipairs(metamethods) do
+								if rawget(mt, method) then
+									metamethodStats[method] = (metamethodStats[method] or 0) + 1
+								end
+							end
+						end
+					end)
+				end
+
+				results = results .. string.format('<b>Metatables Found: <font color="#5AA3E0">%d</font></b>\n\n', metatableCount)
+
+				-- Analyze game metatable specifically
+				results = results .. '<b>🎮 GAME METATABLE ANALYSIS:</b>\n'
+				pcall(function()
+					local gameMT = getrawmetatable(game)
+					if gameMT then
+						results = results .. '<font color="#50B464">✓ Game metatable accessible</font>\n\n'
+
+						results = results .. '<b>Metamethods Present:</b>\n'
+						for _, method in ipairs(metamethods) do
+							local has = rawget(gameMT, method)
+							if has then
+								local funcType = type(has)
+								results = results .. string.format('<font color="#50B464">✓</font> %s (%s)\n', method, funcType)
+							end
+						end
+
+						-- Check if metatable is protected
+						local isProtected = false
+						pcall(function()
+							local test = gameMT.__metatable
+							if test then
+								isProtected = true
+							end
+						end)
+
+						results = results .. string.format('\n<b>Protected:</b> <font color="%s">%s</font>\n',
+							isProtected and "#B45050" or "#50B464", tostring(isProtected))
+					else
+						results = results .. '<font color="#B45050">✗ Game metatable not accessible</font>\n'
+					end
+				end)
+
+				-- Metamethod statistics
+				results = results .. '\n<b>📊 METAMETHOD STATISTICS:</b>\n'
+				local sorted = {}
+				for method, count in pairs(metamethodStats) do
+					table.insert(sorted, {method = method, count = count})
+				end
+				table.sort(sorted, function(a, b) return a.count > b.count end)
+
+				for i, data in ipairs(sorted) do
+					if i <= 10 then
+						results = results .. string.format('%d. <font color="#5AA3E0">%s</font>: %d instances\n', i, data.method, data.count)
+					end
+				end
+
+				-- Check hooking capabilities
+				results = results .. '\n<b>🔧 HOOKING CAPABILITIES:</b>\n'
+				if hookmetamethod then
+					results = results .. '<font color="#50B464">✓ hookmetamethod</font> - Can hook metamethods\n'
+				else
+					results = results .. '<font color="#B45050">✗ hookmetamethod</font> - Not available\n'
+				end
+
+				if getrawmetatable then
+					results = results .. '<font color="#50B464">✓ getrawmetatable</font> - Can access metatables\n'
+				else
+					results = results .. '<font color="#B45050">✗ getrawmetatable</font> - Not available\n'
+				end
+
+				if setrawmetatable then
+					results = results .. '<font color="#50B464">✓ setrawmetatable</font> - Can modify metatables\n'
+				else
+					results = results .. '<font color="#B45050">✗ setrawmetatable</font> - Not available\n'
+				end
+
+				createResultsWindow("Metatable Deep Analyzer", results, screenGui)
+			end
+		},
+		{
+			name = "🧬 Upvalue Explorer",
+			desc = "Extract and analyze function upvalues and closures",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				local results = "<b>UPVALUE EXPLORER</b>\n\n"
+				results = results .. '<b><font color="#9664C8">🧬 CLOSURE & UPVALUE ANALYSIS</font></b>\n\n'
+
+				-- Check capabilities
+				results = results .. '<b>🔧 CAPABILITIES:</b>\n'
+				local hasDebug = debug and debug.getupvalue and debug.setupvalue
+				local hasGetUpvalues = getupvalues ~= nil
+				local hasGetConstants = getconstants ~= nil
+
+				if hasDebug then
+					results = results .. '<font color="#50B464">✓ debug.getupvalue/setupvalue</font> - Can read/write upvalues\n'
+				else
+					results = results .. '<font color="#B45050">✗ debug.getupvalue/setupvalue</font> - Not available\n'
+				end
+
+				if hasGetUpvalues then
+					results = results .. '<font color="#50B464">✓ getupvalues</font> - Can dump all upvalues\n'
+				else
+					results = results .. '<font color="#B45050">✗ getupvalues</font> - Not available\n'
+				end
+
+				if hasGetConstants then
+					results = results .. '<font color="#50B464">✓ getconstants</font> - Can extract constants\n'
+				else
+					results = results .. '<font color="#B45050">✗ getconstants</font> - Not available\n'
+				end
+
+				if getinfo then
+					results = results .. '<font color="#50B464">✓ getinfo</font> - Can analyze function info\n'
+				else
+					results = results .. '<font color="#B45050">✗ getinfo</font> - Not available\n'
+				end
+
+				-- Analyze some scripts for upvalues
+				if hasDebug or hasGetUpvalues then
+					results = results .. '\n<b>📊 UPVALUE SCAN RESULTS:</b>\n'
+					local scriptsAnalyzed = 0
+					local totalUpvalues = 0
+					local interestingUpvalues = {}
+
+					for _, script in ipairs(game:GetDescendants()) do
+						if script:IsA("LocalScript") and scriptsAnalyzed < 15 then
+							pcall(function()
+								if getsenv then
+									local env = getsenv(script)
+									if env then
+										scriptsAnalyzed = scriptsAnalyzed + 1
+
+										-- Try to find functions in environment
+										for name, value in pairs(env) do
+											if type(value) == "function" then
+												-- Get upvalues
+												if hasGetUpvalues and getupvalues then
+													local upvals = getupvalues(value)
+													if upvals and next(upvals) then
+														totalUpvalues = totalUpvalues + #upvals
+
+														-- Check for interesting upvalues
+														for upName, upValue in pairs(upvals) do
+															if type(upValue) == "table" or type(upValue) == "function" then
+																table.insert(interestingUpvalues, {
+																	script = script.Name,
+																	func = name,
+																	upvalue = upName,
+																	type = type(upValue)
+																})
+															end
+														end
+													end
+												elseif hasDebug then
+													local i = 1
+													while true do
+														local upName, upValue = debug.getupvalue(value, i)
+														if not upName then break end
+														totalUpvalues = totalUpvalues + 1
+
+														if type(upValue) == "table" or type(upValue) == "function" then
+															table.insert(interestingUpvalues, {
+																script = script.Name,
+																func = name,
+																upvalue = upName,
+																type = type(upValue)
+															})
+														end
+														i = i + 1
+													end
+												end
+											end
+										end
+									end
+								end
+							end)
+						end
+					end
+
+					results = results .. string.format('\n<b>Scripts Analyzed:</b> %d\n', scriptsAnalyzed)
+					results = results .. string.format('<b>Total Upvalues Found:</b> <font color="#5AA3E0">%d</font>\n', totalUpvalues)
+					results = results .. string.format('<b>Interesting Upvalues:</b> <font color="#C8B450">%d</font>\n\n', #interestingUpvalues)
+
+					if #interestingUpvalues > 0 then
+						results = results .. '<b>🔍 INTERESTING UPVALUES:</b>\n'
+						for i, data in ipairs(interestingUpvalues) do
+							if i <= 20 then
+								results = results .. string.format('<font color="#9664C8">%s</font>.%s\n  ↳ upvalue: %s (%s)\n',
+									data.script, data.func, data.upvalue, data.type)
+							end
+						end
+						if #interestingUpvalues > 20 then
+							results = results .. string.format('\n... and %d more\n', #interestingUpvalues - 20)
+						end
+					end
+				else
+					results = results .. '\n<font color="#B45050">No upvalue analysis functions available</font>\n'
+				end
+
+				results = results .. '\n<b>💡 USE CASES:</b>\n'
+				results = results .. '• Bypass anti-cheat by modifying upvalues\n'
+				results = results .. '• Extract hidden configuration data\n'
+				results = results .. '• Analyze obfuscated code structure\n'
+				results = results .. '• Find references to protected instances\n'
+
+				createResultsWindow("Upvalue Explorer", results, screenGui)
+			end
+		},
+		{
+			name = "🗑️ GC Memory Scanner",
+			desc = "Scan garbage collector for hidden objects",
+			color = CONFIG.Colors.AccentGreen,
+			callback = function()
+				local results = "<b>GC MEMORY SCANNER</b>\n\n"
+				results = results .. '<b><font color="#50B464">🗑️ GARBAGE COLLECTOR ANALYSIS</font></b>\n\n'
+
+				-- Check if getgc is available
+				if not getgc then
+					results = results .. '<font color="#B45050">✗ getgc() not available</font>\n\n'
+					results = results .. 'This feature requires an executor with getgc() support.\n'
+					results = results .. '\n<b>What getgc() does:</b>\n'
+					results = results .. '• Scans Lua garbage collector for all objects\n'
+					results = results .. '• Finds hidden tables, functions, and instances\n'
+					results = results .. '• Bypasses normal game hierarchy\n'
+					results = results .. '• Reveals obfuscated data structures\n'
+					createResultsWindow("GC Memory Scanner", results, screenGui)
+					return
+				end
+
+				results = results .. '<font color="#50B464">✓ getgc() available - Scanning...</font>\n\n'
+
+				-- Scan GC
+				local gcObjects = getgc(true) -- true = include tables
+
+				local stats = {
+					total = #gcObjects,
+					functions = 0,
+					tables = 0,
+					userdata = 0,
+					threads = 0,
+					instances = 0,
+					hiddenInstances = {}
+				}
+
+				-- Analyze GC objects
+				for _, obj in ipairs(gcObjects) do
+					local objType = type(obj)
+
+					if objType == "function" then
+						stats.functions = stats.functions + 1
+					elseif objType == "table" then
+						stats.tables = stats.tables + 1
+					elseif objType == "userdata" then
+						stats.userdata = stats.userdata + 1
+
+						-- Check if it's a Roblox instance
+						pcall(function()
+							if typeof(obj) == "Instance" then
+								stats.instances = stats.instances + 1
+
+								-- Check if instance is "hidden" (not in game tree)
+								local isHidden = true
+								pcall(function()
+									if obj:IsDescendantOf(game) then
+										isHidden = false
+									end
+								end)
+
+								if isHidden and #stats.hiddenInstances < 50 then
+									table.insert(stats.hiddenInstances, obj)
+								end
+							end
+						end)
+					elseif objType == "thread" then
+						stats.threads = stats.threads + 1
+					end
+				end
+
+				-- Display results
+				results = results .. '<b>📊 GC STATISTICS:</b>\n'
+				results = results .. string.format('<b>Total Objects:</b> <font color="#5AA3E0">%d</font>\n\n', stats.total)
+				results = results .. string.format('Functions: <font color="#C8B450">%d</font>\n', stats.functions)
+				results = results .. string.format('Tables: <font color="#9664C8">%d</font>\n', stats.tables)
+				results = results .. string.format('Userdata: <font color="#5AA3E0">%d</font>\n', stats.userdata)
+				results = results .. string.format('Threads: <font color="#50B464">%d</font>\n', stats.threads)
+				results = results .. string.format('Instances: <font color="#B45050">%d</font>\n', stats.instances)
+
+				-- Hidden instances
+				if #stats.hiddenInstances > 0 then
+					results = results .. string.format('\n<b><font color="#B45050">🔍 HIDDEN INSTANCES: %d</font></b>\n', #stats.hiddenInstances)
+					results = results .. '<i>(Not in game hierarchy, possibly deleted or temp objects)</i>\n\n'
+
+					for i, inst in ipairs(stats.hiddenInstances) do
+						if i <= 30 then
+							local name = "???"
+							local className = "???"
+							pcall(function()
+								name = inst.Name
+								className = inst.ClassName
+							end)
+							results = results .. string.format('%d. <font color="#B45050">%s</font>: %s\n', i, className, name)
+						end
+					end
+
+					if #stats.hiddenInstances > 30 then
+						results = results .. string.format('\n... and %d more hidden instances\n', #stats.hiddenInstances - 30)
+					end
+				end
+
+				-- Percentage breakdown
+				results = results .. '\n<b>📈 BREAKDOWN:</b>\n'
+				results = results .. string.format('Functions: %.1f%%\n', (stats.functions / stats.total) * 100)
+				results = results .. string.format('Tables: %.1f%%\n', (stats.tables / stats.total) * 100)
+				results = results .. string.format('Userdata: %.1f%%\n', (stats.userdata / stats.total) * 100)
+
+				results = results .. '\n<b>💡 USE CASES:</b>\n'
+				results = results .. '• Find deleted but still referenced objects\n'
+				results = results .. '• Discover hidden anti-cheat modules\n'
+				results = results .. '• Locate temporary data structures\n'
+				results = results .. '• Memory leak detection\n'
+
+				createResultsWindow("GC Memory Scanner", results, screenGui)
+			end
+		},
+		{
+			name = "⚙️ Function Hook Generator",
+			desc = "Auto-generate hooks for any function",
+			color = CONFIG.Colors.AccentBlue,
+			callback = function()
+				local results = "<b>FUNCTION HOOK GENERATOR</b>\n\n"
+				results = results .. '<b><font color="#5AA3E0">⚙️ ADVANCED FUNCTION HOOKING</font></b>\n\n'
+
+				-- Check capabilities
+				results = results .. '<b>🔧 HOOKING CAPABILITIES:</b>\n'
+
+				if hookfunction then
+					results = results .. '<font color="#50B464">✓ hookfunction</font> - Can hook any function\n'
+				else
+					results = results .. '<font color="#B45050">✗ hookfunction</font> - Not available\n'
+				end
+
+				if hookmetamethod then
+					results = results .. '<font color="#50B464">✓ hookmetamethod</font> - Can hook metamethods\n'
+				else
+					results = results .. '<font color="#B45050">✗ hookmetamethod</font> - Not available\n'
+				end
+
+				if newcclosure then
+					results = results .. '<font color="#50B464">✓ newcclosure</font> - Can create C closures\n'
+				else
+					results = results .. '<font color="#B45050">✗ newcclosure</font> - Not available\n'
+				end
+
+				if replaceclosure then
+					results = results .. '<font color="#50B464">✓ replaceclosure</font> - Can replace closures\n'
+				else
+					results = results .. '<font color="#B45050">✗ replaceclosure</font> - Not available\n'
+				end
+
+				-- Common hook targets
+				results = results .. '\n<b>🎯 COMMON HOOK TARGETS:</b>\n\n'
+
+				local hookTargets = {
+					{name = "RemoteEvent:FireServer", desc = "Intercept remote calls"},
+					{name = "RemoteFunction:InvokeServer", desc = "Intercept function calls"},
+					{name = "game:GetService", desc = "Track service access"},
+					{name = "Instance.new", desc = "Monitor object creation"},
+					{name = "require", desc = "Track module loading"},
+					{name = "loadstring", desc = "Monitor code execution"},
+				}
+
+				for i, target in ipairs(hookTargets) do
+					results = results .. string.format('<font color="#5AA3E0">%d. %s</font>\n   %s\n', i, target.name, target.desc)
+				end
+
+				-- Example hook code
+				results = results .. '\n<b>📝 EXAMPLE HOOK CODE:</b>\n'
+				results = results .. '<font color="#C8B450">-- Hook RemoteEvent:FireServer</font>\n'
+				results = results .. 'local oldFireServer = hookfunction(\n'
+				results = results .. '    game.FindFirstChildOfClass("RemoteEvent").FireServer,\n'
+				results = results .. '    function(self, ...)\n'
+				results = results .. '        print("FireServer called:", self.Name, ...)\n'
+				results = results .. '        return oldFireServer(self, ...)\n'
+				results = results .. '    end\n'
+				results = results .. ')\n'
+
+				-- Hook statistics
+				if hookfunction then
+					results = results .. '\n<b>🔍 HOOKABLE FUNCTIONS SCAN:</b>\n'
+					local scanned = 0
+					local hookable = 0
+
+					-- Scan for common hookable functions
+					pcall(function()
+						if game.GetService then
+							hookable = hookable + 1
+							results = results .. '<font color="#50B464">✓</font> game:GetService\n'
+						end
+					end)
+
+					pcall(function()
+						if Instance.new then
+							hookable = hookable + 1
+							results = results .. '<font color="#50B464">✓</font> Instance.new\n'
+						end
+					end)
+
+					pcall(function()
+						if require then
+							hookable = hookable + 1
+							results = results .. '<font color="#50B464">✓</font> require\n'
+						end
+					end)
+
+					results = results .. string.format('\n<b>Hookable Functions Found: %d</b>\n', hookable)
+				end
+
+				results = results .. '\n<b>⚠️ WARNING:</b>\n'
+				results = results .. 'Hooking can break game functionality if done incorrectly.\n'
+				results = results .. 'Always return the original function result!\n'
+
+				results = results .. '\n<b>💡 ADVANCED TECHNIQUES:</b>\n'
+				results = results .. '• Use newcclosure() to hide hooks from detection\n'
+				results = results .. '• Hook metamethods for deeper control\n'
+				results = results .. '• Chain multiple hooks for complex logic\n'
+				results = results .. '• Use debug.getinfo() to analyze hooked functions\n'
+
+				createResultsWindow("Function Hook Generator", results, screenGui)
+			end
+		},
+		{
+			name = "🛡️ Environment Pollution Detector",
+			desc = "Detect modified global environment and anti-cheat",
+			color = CONFIG.Colors.AccentYellow,
+			callback = function()
+				local results = "<b>ENVIRONMENT POLLUTION DETECTOR</b>\n\n"
+				results = results .. '<b><font color="#C8B450">🛡️ ANTI-CHEAT & ENVIRONMENT ANALYSIS</font></b>\n\n'
+
+				-- Check for common executor functions (pollution indicators)
+				local executorFunctions = {
+					"getgenv", "getrenv", "getsenv", "getrawmetatable", "setrawmetatable",
+					"hookfunction", "hookmetamethod", "newcclosure", "checkcaller",
+					"getloadedmodules", "getrunningscripts", "getcallingscript",
+					"decompile", "saveinstance", "setclipboard", "getclipboard",
+					"writefile", "readfile", "listfiles", "isfile", "isfolder",
+					"makefolder", "delfolder", "delfile", "loadstring",
+					"getgc", "getupvalues", "getconstants", "getinfo",
+					"debug.getupvalue", "debug.setupvalue", "debug.getinfo"
+				}
+
+				results = results .. '<b>🔍 EXECUTOR FUNCTION DETECTION:</b>\n'
+				local pollutionCount = 0
+				local detectedFunctions = {}
+
+				for _, funcName in ipairs(executorFunctions) do
+					local exists = false
+
+					-- Check in global environment
+					if funcName:find("%.") then
+						-- Handle debug.* functions
+						local parts = funcName:split(".")
+						pcall(function()
+							if _G[parts[1]] and _G[parts[1]][parts[2]] then
+								exists = true
+							end
+						end)
+					else
+						if _G[funcName] then
+							exists = true
+						end
+					end
+
+					if exists then
+						pollutionCount = pollutionCount + 1
+						table.insert(detectedFunctions, funcName)
+					end
+				end
+
+				results = results .. string.format('<b>Pollution Level:</b> <font color="%s">%d/%d functions</font>\n\n',
+					pollutionCount > 15 and "#B45050" or pollutionCount > 5 and "#C8B450" or "#50B464",
+					pollutionCount, #executorFunctions)
+
+				if pollutionCount > 0 then
+					results = results .. '<b>Detected Functions:</b>\n'
+					for i, funcName in ipairs(detectedFunctions) do
+						if i <= 25 then
+							results = results .. string.format('<font color="#B45050">•</font> %s\n', funcName)
+						end
+					end
+					if #detectedFunctions > 25 then
+						results = results .. string.format('... and %d more\n', #detectedFunctions - 25)
+					end
+				end
+
+				-- Check for common anti-cheat patterns
+				results = results .. '\n<b>🛡️ ANTI-CHEAT DETECTION:</b>\n'
+				local antiCheatIndicators = {
+					{name = "Adonis Anti-Cheat", check = function()
+						return game:GetService("ReplicatedStorage"):FindFirstChild("HDAdminClient") ~= nil
+					end},
+					{name = "Unnamed Anti-Cheat", check = function()
+						return game:GetService("ReplicatedStorage"):FindFirstChild("ProtectGui") ~= nil
+					end},
+					{name = "Custom Anti-Kick", check = function()
+						return game:GetService("ReplicatedStorage"):FindFirstChild("AntiKick") ~= nil
+					end},
+					{name = "RemoteSpy Detection", check = function()
+						local detected = false
+						for _, remote in ipairs(game:GetDescendants()) do
+							if remote:IsA("RemoteEvent") and remote.Name:match("AntiCheat") then
+								detected = true
+								break
+							end
+						end
+						return detected
+					end},
+				}
+
+				for _, indicator in ipairs(antiCheatIndicators) do
+					local success, detected = pcall(indicator.check)
+					if success and detected then
+						results = results .. string.format('<font color="#B45050">⚠️</font> %s detected\n', indicator.name)
+					else
+						results = results .. string.format('<font color="#50B464">✓</font> %s not detected\n', indicator.name)
+					end
+				end
+
+				-- Check for modified metatables
+				results = results .. '\n<b>🔬 METATABLE TAMPERING:</b>\n'
+				local tamperingDetected = false
+
+				pcall(function()
+					local mt = getrawmetatable(game)
+					if mt then
+						-- Check if __namecall is hooked
+						if mt.__namecall then
+							local info = debug.getinfo(mt.__namecall)
+							if info and info.what == "Lua" then
+								results = results .. '<font color="#B45050">⚠️</font> __namecall appears hooked (Lua function)\n'
+								tamperingDetected = true
+							else
+								results = results .. '<font color="#50B464">✓</font> __namecall appears clean\n'
+							end
+						end
+
+						-- Check if __index is hooked
+						if mt.__index then
+							local indexType = type(mt.__index)
+							if indexType == "function" then
+								results = results .. '<font color="#C8B450">?</font> __index is a function (may be hooked)\n'
+							else
+								results = results .. '<font color="#50B464">✓</font> __index is a table\n'
+							end
+						end
+					end
+				end)
+
+				if not tamperingDetected then
+					results = results .. '<font color="#50B464">No obvious metatable tampering detected</font>\n'
+				end
+
+				-- Environment integrity check
+				results = results .. '\n<b>🌍 GLOBAL ENVIRONMENT INTEGRITY:</b>\n'
+				local modifiedGlobals = 0
+				local suspiciousGlobals = {}
+
+				for key, value in pairs(_G) do
+					if type(key) == "string" then
+						-- Check for suspicious names
+						if key:lower():match("cheat") or key:lower():match("hack") or
+						   key:lower():match("exploit") or key:lower():match("script") then
+							modifiedGlobals = modifiedGlobals + 1
+							if #suspiciousGlobals < 10 then
+								table.insert(suspiciousGlobals, key)
+							end
+						end
+					end
+				end
+
+				if #suspiciousGlobals > 0 then
+					results = results .. string.format('<font color="#B45050">⚠️</font> %d suspicious globals found:\n', modifiedGlobals)
+					for _, global in ipairs(suspiciousGlobals) do
+						results = results .. string.format('  • _G.%s\n', global)
+					end
+				else
+					results = results .. '<font color="#50B464">✓</font> No suspicious globals detected\n'
+				end
+
+				-- Detection evasion tips
+				results = results .. '\n<b>💡 EVASION TECHNIQUES:</b>\n'
+				results = results .. '• Use getfenv/setfenv to isolate functions\n'
+				results = results .. '• Clean up global environment after use\n'
+				results = results .. '• Use newcclosure() for undetectable hooks\n'
+				results = results .. '• Avoid obvious variable names\n'
+				results = results .. '• Use metatables to hide functionality\n'
+
+				createResultsWindow("Environment Pollution Detector", results, screenGui)
+			end
+		},
+		{
+			name = "📞 Call Stack Analyzer",
+			desc = "Deep analysis of function call stacks and traces",
+			color = CONFIG.Colors.AccentPurple,
+			callback = function()
+				local results = "<b>CALL STACK ANALYZER</b>\n\n"
+				results = results .. '<b><font color="#9664C8">📞 ADVANCED CALL STACK TRACING</font></b>\n\n'
+
+				-- Check capabilities
+				results = results .. '<b>🔧 CAPABILITIES:</b>\n'
+
+				if debug and debug.traceback then
+					results = results .. '<font color="#50B464">✓ debug.traceback</font> - Can get stack traces\n'
+				else
+					results = results .. '<font color="#B45050">✗ debug.traceback</font> - Not available\n'
+				end
+
+				if debug and debug.getinfo then
+					results = results .. '<font color="#50B464">✓ debug.getinfo</font> - Can analyze stack frames\n'
+				else
+					results = results .. '<font color="#B45050">✗ debug.getinfo</font> - Not available\n'
+				end
+
+				if getcallingscript then
+					results = results .. '<font color="#50B464">✓ getcallingscript</font> - Can identify caller\n'
+				else
+					results = results .. '<font color="#B45050">✗ getcallingscript</font> - Not available\n'
+				end
+
+				if checkcaller then
+					results = results .. '<font color="#50B464">✓ checkcaller</font> - Can verify caller source\n'
+				else
+					results = results .. '<font color="#B45050">✗ checkcaller</font> - Not available\n'
+				end
+
+				-- Get current stack trace
+				if debug and debug.traceback then
+					results = results .. '\n<b>📊 CURRENT STACK TRACE:</b>\n'
+					local trace = debug.traceback()
+					local lines = trace:split("\n")
+					for i, line in ipairs(lines) do
+						if i <= 15 and line ~= "" then
+							results = results .. string.format('<font color="#9664C8">%s</font>\n', line:gsub("\t", "  "))
+						end
+					end
+					if #lines > 15 then
+						results = results .. string.format('... and %d more frames\n', #lines - 15)
+					end
+				end
+
+				-- Analyze stack depth
+				if debug and debug.getinfo then
+					results = results .. '\n<b>🔍 STACK DEPTH ANALYSIS:</b>\n'
+					local level = 1
+					local frames = {}
+
+					while true do
+						local info = debug.getinfo(level, "nSl")
+						if not info then break end
+
+						table.insert(frames, {
+							level = level,
+							name = info.name or "?",
+							source = info.source or "?",
+							currentline = info.currentline,
+							what = info.what
+						})
+
+						level = level + 1
+						if level > 50 then break end -- Safety limit
+					end
+
+					results = results .. string.format('<b>Total Stack Frames:</b> <font color="#5AA3E0">%d</font>\n\n', #frames)
+
+					-- Categorize frames
+					local luaFrames = 0
+					local cFrames = 0
+					local mainFrames = 0
+
+					for _, frame in ipairs(frames) do
+						if frame.what == "Lua" then
+							luaFrames = luaFrames + 1
+						elseif frame.what == "C" then
+							cFrames = cFrames + 1
+						elseif frame.what == "main" then
+							mainFrames = mainFrames + 1
+						end
+					end
+
+					results = results .. '<b>Frame Types:</b>\n'
+					results = results .. string.format('Lua Frames: <font color="#C8B450">%d</font>\n', luaFrames)
+					results = results .. string.format('C Frames: <font color="#5AA3E0">%d</font>\n', cFrames)
+					results = results .. string.format('Main Frames: <font color="#50B464">%d</font>\n', mainFrames)
+
+					-- Show detailed frames
+					results = results .. '\n<b>📋 DETAILED FRAMES:</b>\n'
+					for i, frame in ipairs(frames) do
+						if i <= 10 then
+							results = results .. string.format('<font color="#9664C8">Level %d:</font> %s\n', frame.level, frame.name)
+							results = results .. string.format('  Source: %s\n', frame.source:sub(1, 50))
+							results = results .. string.format('  Line: %d | Type: %s\n', frame.currentline or -1, frame.what)
+						end
+					end
+					if #frames > 10 then
+						results = results .. string.format('\n... and %d more frames\n', #frames - 10)
+					end
+				end
+
+				-- Caller verification
+				if checkcaller then
+					results = results .. '\n<b>🔐 CALLER VERIFICATION:</b>\n'
+					local isExploitCaller = checkcaller()
+					results = results .. string.format('Current caller is exploit: <font color="%s">%s</font>\n',
+						isExploitCaller and "#50B464" or "#B45050", tostring(isExploitCaller))
+				end
+
+				if getcallingscript then
+					results = results .. '\n<b>📜 CALLING SCRIPT:</b>\n'
+					local success, script = pcall(getcallingscript)
+					if success and script then
+						results = results .. string.format('<font color="#5AA3E0">%s</font>\n', script:GetFullName())
+						results = results .. string.format('ClassName: %s\n', script.ClassName)
+					else
+						results = results .. '<font color="#C8B450">No script context (likely executor)</font>\n'
+					end
+				end
+
+				results = results .. '\n<b>💡 USE CASES:</b>\n'
+				results = results .. '• Debug complex execution flows\n'
+				results = results .. '• Identify call origins for security\n'
+				results = results .. '• Trace anti-cheat detection paths\n'
+				results = results .. '• Analyze performance bottlenecks\n'
+				results = results .. '• Reverse engineer obfuscated code\n'
+
+				createResultsWindow("Call Stack Analyzer", results, screenGui)
+			end
+		},
 	}
 
 	for i, tool in ipairs(tools) do

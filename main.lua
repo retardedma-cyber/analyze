@@ -129,6 +129,132 @@ local function getSourceTag(obj)
 	return "Unknown"
 end
 
+-- ========================
+-- RESULTS WINDOW SYSTEM
+-- ========================
+
+local function createResultsWindow(title, content, parentGui)
+	-- Create overlay
+	local overlay = Instance.new("Frame")
+	overlay.Name = "ResultsOverlay"
+	overlay.Parent = parentGui
+	overlay.Size = UDim2.new(1, 0, 1, 0)
+	overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	overlay.BackgroundTransparency = 0.5
+	overlay.BorderSizePixel = 0
+	overlay.ZIndex = 5000
+
+	-- Results window
+	local resultsWindow = Instance.new("Frame")
+	resultsWindow.Name = "ResultsWindow"
+	resultsWindow.Parent = overlay
+	resultsWindow.Position = UDim2.new(0.5, -300, 0.5, -250)
+	resultsWindow.Size = UDim2.new(0, 600, 0, 500)
+	resultsWindow.BackgroundColor3 = CONFIG.Colors.Background
+	resultsWindow.BorderSizePixel = 1
+	resultsWindow.BorderColor3 = CONFIG.Colors.Border
+	resultsWindow.ZIndex = 5001
+	createUICorner(8).Parent = resultsWindow
+
+	-- Title bar
+	local titleBar = Instance.new("Frame")
+	titleBar.Parent = resultsWindow
+	titleBar.Size = UDim2.new(1, 0, 0, 35)
+	titleBar.BackgroundColor3 = CONFIG.Colors.TopBar
+	titleBar.BorderSizePixel = 0
+	titleBar.ZIndex = 5002
+	createUICorner(8).Parent = titleBar
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Parent = titleBar
+	titleLabel.Position = UDim2.new(0, 12, 0, 0)
+	titleLabel.Size = UDim2.new(1, -50, 1, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = CONFIG.FontBold
+	titleLabel.Text = title
+	titleLabel.TextColor3 = CONFIG.Colors.Text
+	titleLabel.TextSize = 15
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 5003
+
+	-- Close button
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Parent = titleBar
+	closeBtn.Position = UDim2.new(1, -30, 0.5, -13)
+	closeBtn.Size = UDim2.new(0, 26, 0, 26)
+	closeBtn.BackgroundColor3 = CONFIG.Colors.AccentRed
+	closeBtn.BorderSizePixel = 0
+	closeBtn.Font = CONFIG.FontBold
+	closeBtn.Text = "X"
+	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeBtn.TextSize = 14
+	closeBtn.AutoButtonColor = false
+	closeBtn.ZIndex = 5003
+	createUICorner(4).Parent = closeBtn
+
+	closeBtn.MouseButton1Click:Connect(function()
+		overlay:Destroy()
+	end)
+
+	-- Content scroll
+	local contentScroll = Instance.new("ScrollingFrame")
+	contentScroll.Parent = resultsWindow
+	contentScroll.Position = UDim2.new(0, 8, 0, 43)
+	contentScroll.Size = UDim2.new(1, -16, 1, -51)
+	contentScroll.BackgroundColor3 = CONFIG.Colors.Button
+	contentScroll.BorderSizePixel = 0
+	contentScroll.ScrollBarThickness = 6
+	contentScroll.ScrollBarImageColor3 = CONFIG.Colors.Border
+	contentScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	contentScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	contentScroll.ZIndex = 5002
+	createUICorner(6).Parent = contentScroll
+
+	local contentText = Instance.new("TextLabel")
+	contentText.Parent = contentScroll
+	contentText.Position = UDim2.new(0, 10, 0, 10)
+	contentText.Size = UDim2.new(1, -20, 0, 0)
+	contentText.BackgroundTransparency = 1
+	contentText.Font = Enum.Font.Code
+	contentText.Text = content
+	contentText.TextColor3 = CONFIG.Colors.Text
+	contentText.TextSize = 12
+	contentText.TextXAlignment = Enum.TextXAlignment.Left
+	contentText.TextYAlignment = Enum.TextYAlignment.Top
+	contentText.TextWrapped = true
+	contentText.AutomaticSize = Enum.AutomaticSize.Y
+	contentText.RichText = true
+	contentText.ZIndex = 5003
+
+	-- Copy button
+	local copyBtn = Instance.new("TextButton")
+	copyBtn.Parent = resultsWindow
+	copyBtn.Position = UDim2.new(1, -110, 0, 5)
+	copyBtn.Size = UDim2.new(0, 75, 0, 25)
+	copyBtn.BackgroundColor3 = CONFIG.Colors.AccentGreen
+	copyBtn.BorderSizePixel = 0
+	copyBtn.Font = CONFIG.FontBold
+	copyBtn.Text = "COPY"
+	copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	copyBtn.TextSize = 11
+	copyBtn.AutoButtonColor = false
+	copyBtn.ZIndex = 5003
+	createUICorner(4).Parent = copyBtn
+
+	copyBtn.MouseButton1Click:Connect(function()
+		local plainText = content:gsub("<[^>]+>", "") -- Remove rich text tags
+		if copyToClipboard(plainText) then
+			copyBtn.Text = "COPIED!"
+			copyBtn.BackgroundColor3 = CONFIG.Colors.AccentBlue
+			task.wait(1)
+			copyBtn.Text = "COPY"
+			copyBtn.BackgroundColor3 = CONFIG.Colors.AccentGreen
+		end
+	end)
+
+	return overlay
+end
+
 local function createUICorner(radius)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius)
@@ -1426,23 +1552,23 @@ local function refreshRemotesList(remotesFrame)
 	end
 end
 
-local function populateToolsTab(toolsFrame)
+local function populateToolsTab(toolsFrame, screenGui)
 	local tools = {
 		{
 			name = "Scan All Remotes",
 			desc = "Find all RemoteEvents and RemoteFunctions",
 			color = CONFIG.Colors.AccentBlue,
 			callback = function()
-				print("=== SCANNING REMOTES ===")
+				local results = "<b>SCANNING REMOTES</b>\n\n"
 				local count = 0
 				for _, desc in ipairs(game:GetDescendants()) do
 					if desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction") then
-						print(desc.ClassName, "->", desc:GetFullName())
+						results = results .. string.format('<font color="#5AA3E0">%s</font> → %s\n', desc.ClassName, desc:GetFullName())
 						count = count + 1
 					end
 				end
-				print("Total found:", count)
-				print("=======================")
+				results = results .. string.format('\n<b><font color="#50B464">Total found: %d</font></b>', count)
+				createResultsWindow("Remote Scanner Results", results, screenGui)
 			end
 		},
 		{
@@ -1450,77 +1576,122 @@ local function populateToolsTab(toolsFrame)
 			desc = "Find all LocalScripts and Scripts",
 			color = CONFIG.Colors.AccentYellow,
 			callback = function()
-				print("=== SCANNING SCRIPTS ===")
-				local count = 0
+				local results = "<b>SCANNING SCRIPTS</b>\n\n"
+				local locals = {}
+				local servers = {}
+				local modules = {}
 				for _, desc in ipairs(game:GetDescendants()) do
-					if desc:IsA("LocalScript") or desc:IsA("Script") then
-						print(desc.ClassName, "->", desc:GetFullName())
-						count = count + 1
+					if desc:IsA("LocalScript") then
+						table.insert(locals, desc)
+					elseif desc:IsA("Script") then
+						table.insert(servers, desc)
+					elseif desc:IsA("ModuleScript") then
+						table.insert(modules, desc)
 					end
 				end
-				print("Total found:", count)
-				print("========================")
+				results = results .. string.format('<b><font color="#C8B450">LocalScripts: %d</font></b>\n', #locals)
+				for i, script in ipairs(locals) do
+					if i <= 50 then
+						results = results .. string.format('  → %s\n', script:GetFullName())
+					end
+				end
+				if #locals > 50 then results = results .. string.format('  ... and %d more\n', #locals - 50) end
+
+				results = results .. string.format('\n<b><font color="#5AA3E0">Scripts: %d</font></b>\n', #servers)
+				for i, script in ipairs(servers) do
+					if i <= 50 then
+						results = results .. string.format('  → %s\n', script:GetFullName())
+					end
+				end
+				if #servers > 50 then results = results .. string.format('  ... and %d more\n', #servers - 50) end
+
+				results = results .. string.format('\n<b><font color="#9664C8">ModuleScripts: %d</font></b>\n', #modules)
+				for i, script in ipairs(modules) do
+					if i <= 50 then
+						results = results .. string.format('  → %s\n', script:GetFullName())
+					end
+				end
+				if #modules > 50 then results = results .. string.format('  ... and %d more\n', #modules - 50) end
+
+				results = results .. string.format('\n<b>Total: %d scripts</b>', #locals + #servers + #modules)
+				createResultsWindow("Script Scanner Results", results, screenGui)
 			end
 		},
 		{
 			name = "Dump Game Tree",
-			desc = "Print entire game hierarchy",
+			desc = "Show game hierarchy tree structure",
 			color = CONFIG.Colors.AccentPurple,
 			callback = function()
-				print("=== GAME TREE DUMP ===")
-				local function printTree(obj, depth)
-					if depth > 5 then return end
-					print(string.rep("  ", depth) .. obj.ClassName .. ": " .. obj.Name)
-					for _, child in ipairs(obj:GetChildren()) do
-						printTree(child, depth + 1)
+				local results = "<b>GAME TREE HIERARCHY</b>\n\n"
+				local function buildTree(obj, depth)
+					if depth > 6 then return "" end
+					local tree = string.rep("  ", depth) .. obj.ClassName .. ": <b>" .. obj.Name .. "</b>\n"
+					for i, child in ipairs(obj:GetChildren()) do
+						if i <= 20 or depth < 2 then
+							tree = tree .. buildTree(child, depth + 1)
+						elseif i == 21 then
+							tree = tree .. string.rep("  ", depth + 1) .. "... and " .. (#obj:GetChildren() - 20) .. " more children\n"
+							break
+						end
 					end
+					return tree
 				end
-				printTree(game, 0)
-				print("======================")
+				results = results .. buildTree(game, 0)
+				createResultsWindow("Game Tree Structure", results, screenGui)
 			end
 		},
 		{
-			name = "Clear Console",
-			desc = "Clear output console (if supported)",
+			name = "Memory Stats",
+			desc = "Show detailed memory and performance statistics",
 			color = CONFIG.Colors.AccentRed,
 			callback = function()
-				if rconsoleclear then
-					rconsoleclear()
-				end
-				print("\n\n\n\n\n\n\n\n\n\n")
-				print("Console cleared")
+				local stats = game:GetService("Stats")
+				local results = "<b>MEMORY & PERFORMANCE STATS</b>\n\n"
+
+				results = results .. "<b><font color=\"#50B464\">Memory:</font></b>\n"
+				pcall(function()
+					results = results .. string.format("  Total Memory: %.2f MB\n", stats:GetTotalMemoryUsageMb())
+				end)
+
+				results = results .. "\n<b><font color=\"#5AA3E0\">Performance:</font></b>\n"
+				results = results .. string.format("  FPS: %.1f\n", 1 / game:GetService("RunService").RenderStepped:Wait())
+				results = results .. string.format("  Ping: %d ms\n", game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+
+				results = results .. "\n<b><font color=\"#C8B450\">Instances:</font></b>\n"
+				results = results .. string.format("  Total in game: %d\n", #game:GetDescendants())
+				results = results .. string.format("  In Workspace: %d\n", #game:GetService("Workspace"):GetDescendants())
+				results = results .. string.format("  In PlayerGui: %d\n", #LocalPlayer.PlayerGui:GetDescendants())
+
+				createResultsWindow("Memory & Performance Stats", results, screenGui)
 			end
 		},
 		{
-			name = "Get Connections",
-			desc = "List all connections of selected GUI (requires getcallbacks)",
+			name = "Explore Services",
+			desc = "Browse all game services and their contents",
 			color = CONFIG.Colors.AccentGreen,
 			callback = function()
-				print("=== GET CONNECTIONS ===")
-				if getconnections then
-					print("Feature available - select a GUI and use '...' menu")
-					print("This shows event connections like MouseButton1Click, etc.")
-				else
-					print("getconnections not supported by exploit")
-				end
-				print("=======================")
-			end
-		},
-		{
-			name = "Dump ModuleScripts",
-			desc = "Find and list all ModuleScripts",
-			color = CONFIG.Colors.AccentBlue,
-			callback = function()
-				print("=== MODULE SCRIPTS ===")
-				local count = 0
-				for _, desc in ipairs(game:GetDescendants()) do
-					if desc:IsA("ModuleScript") then
-						print("ModuleScript ->", desc:GetFullName())
-						count = count + 1
+				local results = "<b>GAME SERVICES EXPLORER</b>\n\n"
+				local services = {
+					"Workspace", "Players", "Lighting", "ReplicatedStorage", "ReplicatedFirst",
+					"ServerStorage", "ServerScriptService", "StarterGui", "StarterPack", "StarterPlayer",
+					"Teams", "SoundService", "Chat", "LocalizationService", "TestService"
+				}
+				for _, serviceName in ipairs(services) do
+					local success, service = pcall(function() return game:GetService(serviceName) end)
+					if success and service then
+						results = results .. string.format('<b><font color="#5AA3E0">%s</font></b> (%d children)\n', serviceName, #service:GetChildren())
+						for i, child in ipairs(service:GetChildren()) do
+							if i <= 15 then
+								results = results .. string.format('  • %s: <i>%s</i>\n', child.ClassName, child.Name)
+							end
+						end
+						if #service:GetChildren() > 15 then
+							results = results .. string.format('  ... and %d more\n', #service:GetChildren() - 15)
+						end
+						results = results .. '\n'
 					end
 				end
-				print("Total found:", count)
-				print("======================")
+				createResultsWindow("Services Explorer", results, screenGui)
 			end
 		},
 		{
@@ -1528,64 +1699,134 @@ local function populateToolsTab(toolsFrame)
 			desc = "Locate all BindableEvents and BindableFunctions",
 			color = CONFIG.Colors.AccentPurple,
 			callback = function()
-				print("=== BINDABLE EVENTS ===")
-				local count = 0
+				local results = "<b>BINDABLE EVENTS SCAN</b>\n\n"
+				local events = {}
+				local functions = {}
 				for _, desc in ipairs(game:GetDescendants()) do
-					if desc:IsA("BindableEvent") or desc:IsA("BindableFunction") then
-						print(desc.ClassName, "->", desc:GetFullName())
-						count = count + 1
+					if desc:IsA("BindableEvent") then
+						table.insert(events, desc)
+					elseif desc:IsA("BindableFunction") then
+						table.insert(functions, desc)
 					end
 				end
-				print("Total found:", count)
-				print("=======================")
+				results = results .. string.format('<b><font color="#50B464">BindableEvents: %d</font></b>\n', #events)
+				for i, event in ipairs(events) do
+					if i <= 50 then
+						results = results .. string.format('  → %s\n', event:GetFullName())
+					end
+				end
+				if #events > 50 then results = results .. string.format('  ... and %d more\n', #events - 50) end
+
+				results = results .. string.format('\n<b><font color="#5AA3E0">BindableFunctions: %d</font></b>\n', #functions)
+				for i, func in ipairs(functions) do
+					if i <= 50 then
+						results = results .. string.format('  → %s\n', func:GetFullName())
+					end
+				end
+				if #functions > 50 then results = results .. string.format('  ... and %d more\n', #functions - 50) end
+
+				results = results .. string.format('\n<b>Total: %d bindables</b>', #events + #functions)
+				createResultsWindow("Bindable Events Results", results, screenGui)
 			end
 		},
 		{
-			name = "Workspace Info",
-			desc = "Get detailed workspace information",
+			name = "Workspace Inspector",
+			desc = "Analyze workspace models and parts",
 			color = CONFIG.Colors.AccentYellow,
 			callback = function()
-				print("=== WORKSPACE INFO ===")
 				local workspace = game:GetService("Workspace")
-				print("Camera:", workspace.CurrentCamera)
-				print("Gravity:", workspace.Gravity)
-				print("Parts count:", #workspace:GetDescendants())
-				print("Models:")
-				for _, obj in ipairs(workspace:GetChildren()) do
-					if obj:IsA("Model") then
-						print("  -", obj.Name, "| PrimaryPart:", obj.PrimaryPart)
+				local results = "<b>WORKSPACE INSPECTOR</b>\n\n"
+
+				results = results .. string.format('<b><font color="#50B464">General Info:</font></b>\n')
+				results = results .. string.format('  Camera: %s\n', tostring(workspace.CurrentCamera))
+				results = results .. string.format('  Gravity: %.1f\n', workspace.Gravity)
+				results = results .. string.format('  Total Descendants: %d\n', #workspace:GetDescendants())
+
+				local models = {}
+				local parts = 0
+				local meshes = 0
+				for _, obj in ipairs(workspace:GetDescendants()) do
+					if obj:IsA("Model") and obj.Parent == workspace then
+						table.insert(models, obj)
+					elseif obj:IsA("BasePart") then
+						parts = parts + 1
+					elseif obj:IsA("MeshPart") or obj:IsA("SpecialMesh") then
+						meshes = meshes + 1
 					end
 				end
-				print("======================")
+
+				results = results .. string.format('\n<b><font color="#5AA3E0">Content:</font></b>\n')
+				results = results .. string.format('  Parts: %d\n', parts)
+				results = results .. string.format('  Meshes: %d\n', meshes)
+				results = results .. string.format('  Top-level Models: %d\n\n', #models)
+
+				results = results .. '<b><font color="#C8B450">Models:</font></b>\n'
+				for i, model in ipairs(models) do
+					if i <= 30 then
+						local primary = model.PrimaryPart and model.PrimaryPart.Name or "none"
+						results = results .. string.format('  • %s (Primary: %s, Children: %d)\n', model.Name, primary, #model:GetChildren())
+					end
+				end
+				if #models > 30 then results = results .. string.format('  ... and %d more models\n', #models - 30) end
+
+				createResultsWindow("Workspace Inspector", results, screenGui)
 			end
 		},
 		{
 			name = "Decompile Scripts",
-			desc = "Attempt to decompile all scripts (requires decompile function)",
+			desc = "Attempt to decompile all scripts (requires decompile)",
 			color = CONFIG.Colors.AccentPurple,
 			callback = function()
-				print("=== DECOMPILING SCRIPTS ===")
+				local results = "<b>SCRIPT DECOMPILER</b>\n\n"
 				if decompile then
-					local count = 0
+					local success_count = 0
+					local failed_count = 0
+					local scripts = {}
+
 					for _, desc in ipairs(game:GetDescendants()) do
 						if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
+							table.insert(scripts, desc)
+						end
+					end
+
+					results = results .. string.format('Found %d scripts to decompile...\n\n', #scripts)
+
+					for i, desc in ipairs(scripts) do
+						if i <= 20 then
 							local success, source = pcall(function()
 								return decompile(desc)
 							end)
-							if success then
-								print("✓ Decompiled:", desc:GetFullName())
-								print("Source length:", #source, "characters")
-								count = count + 1
+							if success and source then
+								results = results .. string.format('<font color="#50B464">✓</font> %s\n  <i>Size: %d chars</i>\n', desc:GetFullName(), #source)
+								success_count = success_count + 1
 							else
-								print("✗ Failed:", desc:GetFullName())
+								results = results .. string.format('<font color="#B45050">✗</font> %s\n  <i>Failed to decompile</i>\n', desc:GetFullName())
+								failed_count = failed_count + 1
+							end
+						else
+							local success, source = pcall(function()
+								return decompile(desc)
+							end)
+							if success and source then
+								success_count = success_count + 1
+							else
+								failed_count = failed_count + 1
 							end
 						end
 					end
-					print("Successfully decompiled:", count)
+
+					if #scripts > 20 then
+						results = results .. string.format('\n... and %d more scripts\n', #scripts - 20)
+					end
+
+					results = results .. string.format('\n<b>Results:</b>\n')
+					results = results .. string.format('<font color="#50B464">  Success: %d</font>\n', success_count)
+					results = results .. string.format('<font color="#B45050">  Failed: %d</font>\n', failed_count)
 				else
-					print("decompile() function not available")
+					results = results .. '<font color="#B45050">decompile() function not available</font>\n\n'
+					results = results .. 'This feature requires an executor with decompile() support.'
 				end
-				print("===========================")
+				createResultsWindow("Decompiler Results", results, screenGui)
 			end
 		},
 		{
@@ -1593,8 +1834,8 @@ local function populateToolsTab(toolsFrame)
 			desc = "Locate all invisible or hidden GUI elements",
 			color = CONFIG.Colors.AccentRed,
 			callback = function()
-				print("=== HIDDEN GUIs ===")
-				local count = 0
+				local results = "<b>HIDDEN GUI SCANNER</b>\n\n"
+				local hidden = {}
 				for _, desc in ipairs(game:GetDescendants()) do
 					if desc:IsA("GuiObject") then
 						local isHidden = false
@@ -1614,13 +1855,23 @@ local function populateToolsTab(toolsFrame)
 							parent = parent.Parent
 						end
 						if isHidden then
-							print("Hidden:", desc.ClassName, "->", desc:GetFullName())
-							count = count + 1
+							table.insert(hidden, desc)
 						end
 					end
 				end
-				print("Total hidden GUIs:", count)
-				print("===================")
+
+				results = results .. string.format('<b><font color="#C8B450">Found %d hidden GUIs</font></b>\n\n', #hidden)
+				for i, obj in ipairs(hidden) do
+					if i <= 100 then
+						local reason = not obj.Visible and "Visible=false" or "Parent hidden"
+						results = results .. string.format('%s → %s\n  <i>(%s)</i>\n', obj.ClassName, obj:GetFullName(), reason)
+					end
+				end
+				if #hidden > 100 then
+					results = results .. string.format('\n... and %d more hidden GUIs', #hidden - 100)
+				end
+
+				createResultsWindow("Hidden GUIs", results, screenGui)
 			end
 		},
 		{
@@ -1628,30 +1879,38 @@ local function populateToolsTab(toolsFrame)
 			desc = "Find all Value objects (StringValue, IntValue, etc.)",
 			color = CONFIG.Colors.AccentGreen,
 			callback = function()
-				print("=== VALUE OBJECTS ===")
+				local results = "<b>VALUE OBJECTS SCANNER</b>\n\n"
 				local values = {}
+				local total = 0
 				for _, desc in ipairs(game:GetDescendants()) do
 					if desc:IsA("ValueBase") then
 						local valType = desc.ClassName
 						values[valType] = values[valType] or {}
 						table.insert(values[valType], desc)
+						total = total + 1
 					end
 				end
+
+				results = results .. string.format('<b>Total Value Objects: %d</b>\n\n', total)
+
 				for valType, list in pairs(values) do
-					print(valType .. ":", #list)
+					results = results .. string.format('<b><font color="#5AA3E0">%s</font></b> (%d)\n', valType, #list)
 					for i, obj in ipairs(list) do
-						if i <= 10 then -- Show first 10 of each type
+						if i <= 15 then
 							local success, val = pcall(function() return obj.Value end)
 							if success then
-								print("  -", obj:GetFullName(), "=", tostring(val))
+								results = results .. string.format('  → %s = <font color="#50B464">%s</font>\n', obj:GetFullName(), tostring(val))
+							else
+								results = results .. string.format('  → %s\n', obj:GetFullName())
 							end
 						end
 					end
-					if #list > 10 then
-						print("  ... and", #list - 10, "more")
+					if #list > 15 then
+						results = results .. string.format('  ... and %d more\n', #list - 15)
 					end
+					results = results .. '\n'
 				end
-				print("=====================")
+				createResultsWindow("Value Objects", results, screenGui)
 			end
 		},
 		{
@@ -1659,32 +1918,46 @@ local function populateToolsTab(toolsFrame)
 			desc = "Show detailed game statistics and info",
 			color = CONFIG.Colors.AccentBlue,
 			callback = function()
-				print("=== GAME STATISTICS ===")
-				print("Game ID:", game.GameId)
-				print("Place ID:", game.PlaceId)
-				print("Creator Type:", game.CreatorType)
-				print("Creator ID:", game.CreatorId)
-				print("Players:", #game:GetService("Players"):GetPlayers())
-				print("Total Instances:", #game:GetDescendants())
-				print("Workspace Children:", #workspace:GetChildren())
+				local results = "<b>GAME STATISTICS</b>\n\n"
 
-				local services = {"ReplicatedStorage", "ReplicatedFirst", "ServerStorage", "ServerScriptService", "StarterPlayer", "StarterPack", "StarterGui", "Lighting"}
-				print("\nServices:")
+				results = results .. '<b><font color="#5AA3E0">Game Info:</font></b>\n'
+				results = results .. string.format('  Game ID: %d\n', game.GameId)
+				results = results .. string.format('  Place ID: %d\n', game.PlaceId)
+				results = results .. string.format('  Creator: %s (ID: %d)\n', game.CreatorType, game.CreatorId)
+				results = results .. string.format('  Job ID: %s\n', game.JobId)
+
+				local players = game:GetService("Players"):GetPlayers()
+				results = results .. string.format('\n<b><font color="#50B464">Players:</font></b> %d\n', #players)
+				for i, player in ipairs(players) do
+					if i <= 20 then
+						results = results .. string.format('  • %s (ID: %d)\n', player.Name, player.UserId)
+					end
+				end
+				if #players > 20 then
+					results = results .. string.format('  ... and %d more\n', #players - 20)
+				end
+
+				results = results .. string.format('\n<b><font color="#C8B450">Instance Count:</font></b>\n')
+				results = results .. string.format('  Total in game: %d\n', #game:GetDescendants())
+				results = results .. string.format('  Workspace: %d\n', #game:GetService("Workspace"):GetChildren())
+
+				local services = {"ReplicatedStorage", "ReplicatedFirst", "ServerScriptService", "StarterPlayer", "StarterPack", "StarterGui", "Lighting"}
+				results = results .. '\n<b>Services:</b>\n'
 				for _, serviceName in ipairs(services) do
 					local success, service = pcall(function() return game:GetService(serviceName) end)
 					if success then
-						print("  " .. serviceName .. ":", #service:GetChildren(), "children")
+						results = results .. string.format('  %s: %d children\n', serviceName, #service:GetChildren())
 					end
 				end
-				print("=======================")
+				createResultsWindow("Game Statistics", results, screenGui)
 			end
 		},
 		{
 			name = "Find All Assets",
-			desc = "Scan for all rbxasset:// and rbxassetid:// references",
+			desc = "Scan for all asset references (Images, Sounds, etc.)",
 			color = CONFIG.Colors.AccentYellow,
 			callback = function()
-				print("=== ASSET SCANNER ===")
+				local results = "<b>ASSET SCANNER</b>\n\n"
 				local assets = {}
 				for _, desc in ipairs(game:GetDescendants()) do
 					for _, prop in ipairs({"Image", "Texture", "SoundId", "MeshId", "VideoId"}) do
@@ -1698,16 +1971,26 @@ local function populateToolsTab(toolsFrame)
 						end
 					end
 				end
-				print("Unique assets found:", #assets)
+
 				local sorted = {}
 				for asset, data in pairs(assets) do
-					table.insert(sorted, {asset = asset, count = data.count})
+					table.insert(sorted, {asset = asset, count = data.count, instances = data.instances})
 				end
 				table.sort(sorted, function(a, b) return a.count > b.count end)
-				for i = 1, math.min(20, #sorted) do
-					print(sorted[i].count .. "x:", sorted[i].asset)
+
+				results = results .. string.format('<b>Unique assets found: %d</b>\n\n', #sorted)
+				results = results .. '<b><font color="#5AA3E0">Most Used Assets:</font></b>\n'
+				for i = 1, math.min(30, #sorted) do
+					results = results .. string.format('<font color="#C8B450">%dx</font> %s\n', sorted[i].count, sorted[i].asset)
+					if i <= 10 then
+						results = results .. string.format('  <i>Used by: %s</i>\n', sorted[i].instances[1])
+					end
 				end
-				print("=====================")
+				if #sorted > 30 then
+					results = results .. string.format('\n... and %d more unique assets', #sorted - 30)
+				end
+
+				createResultsWindow("Asset Scanner", results, screenGui)
 			end
 		},
 		{
@@ -1715,33 +1998,52 @@ local function populateToolsTab(toolsFrame)
 			desc = "Inspect local player character and humanoid",
 			color = CONFIG.Colors.AccentPurple,
 			callback = function()
-				print("=== CHARACTER INFO ===")
+				local results = "<b>CHARACTER INSPECTOR</b>\n\n"
 				local player = game:GetService("Players").LocalPlayer
 				local char = player.Character
+
 				if char then
-					print("Character:", char.Name)
+					results = results .. string.format('<b><font color="#5AA3E0">Character:</font></b> %s\n\n', char.Name)
+
 					local humanoid = char:FindFirstChildOfClass("Humanoid")
 					if humanoid then
-						print("Health:", humanoid.Health, "/", humanoid.MaxHealth)
-						print("WalkSpeed:", humanoid.WalkSpeed)
-						print("JumpPower:", humanoid.JumpPower)
-						print("State:", humanoid:GetState())
+						results = results .. '<b><font color="#50B464">Humanoid:</font></b>\n'
+						results = results .. string.format('  Health: %.1f / %.1f\n', humanoid.Health, humanoid.MaxHealth)
+						results = results .. string.format('  WalkSpeed: %.1f\n', humanoid.WalkSpeed)
+						results = results .. string.format('  JumpPower: %.1f\n', humanoid.JumpPower)
+						results = results .. string.format('  State: %s\n', tostring(humanoid:GetState()))
+						results = results .. string.format('  DisplayName: %s\n', humanoid.DisplayName)
 					end
+
 					local root = char:FindFirstChild("HumanoidRootPart")
 					if root then
-						print("Position:", root.Position)
-						print("CFrame:", root.CFrame)
+						results = results .. '\n<b><font color="#C8B450">Position:</font></b>\n'
+						results = results .. string.format('  Position: %s\n', tostring(root.Position))
+						results = results .. string.format('  CFrame: %s\n', tostring(root.CFrame))
 					end
-					print("\nParts:")
+
+					results = results .. '\n<b>Parts:</b>\n'
 					for _, part in ipairs(char:GetChildren()) do
 						if part:IsA("BasePart") then
-							print("  -", part.Name, "| Size:", part.Size)
+							results = results .. string.format('  • %s (Size: %s)\n', part.Name, tostring(part.Size))
 						end
 					end
+
+					local accessories = char:GetChildren()
+					local accCount = 0
+					for _, obj in ipairs(accessories) do
+						if obj:IsA("Accessory") then
+							accCount = accCount + 1
+						end
+					end
+					if accCount > 0 then
+						results = results .. string.format('\n<b>Accessories:</b> %d equipped\n', accCount)
+					end
 				else
-					print("Character not loaded")
+					results = results .. '<font color="#B45050">Character not loaded</font>'
 				end
-				print("======================")
+
+				createResultsWindow("Character Inspector", results, screenGui)
 			end
 		},
 		{
@@ -1749,24 +2051,36 @@ local function populateToolsTab(toolsFrame)
 			desc = "Find all instances with custom attributes",
 			color = CONFIG.Colors.AccentGreen,
 			callback = function()
-				print("=== ATTRIBUTES DUMP ===")
-				local count = 0
+				local results = "<b>ATTRIBUTES DUMP</b>\n\n"
+				local found = {}
 				for _, desc in ipairs(game:GetDescendants()) do
 					local attrs = desc:GetAttributes()
 					local hasAttrs = false
 					for k, v in pairs(attrs) do
-						if not hasAttrs then
-							print("\n" .. desc:GetFullName())
-							hasAttrs = true
-						end
-						print("  [" .. k .. "]", "=", formatValue(v))
+						hasAttrs = true
+						break
 					end
 					if hasAttrs then
-						count = count + 1
+						table.insert(found, {obj = desc, attrs = attrs})
 					end
 				end
-				print("\nTotal instances with attributes:", count)
-				print("=======================")
+
+				results = results .. string.format('<b>Total instances with attributes: %d</b>\n\n', #found)
+
+				for i, data in ipairs(found) do
+					if i <= 50 then
+						results = results .. string.format('<b><font color="#5AA3E0">%s</font></b>\n', data.obj:GetFullName())
+						for k, v in pairs(data.attrs) do
+							results = results .. string.format('  [%s] = <font color="#50B464">%s</font>\n', k, formatValue(v))
+						end
+						results = results .. '\n'
+					end
+				end
+				if #found > 50 then
+					results = results .. string.format('... and %d more instances with attributes', #found - 50)
+				end
+
+				createResultsWindow("Attributes Dump", results, screenGui)
 			end
 		},
 	}
@@ -1977,49 +2291,48 @@ local function setupChatSpy(chatScroll)
 	local Players = game:GetService("Players")
 	local player = Players.LocalPlayer
 
-	-- Try to find chat system
+	-- Try new TextChatService first
+	local TextChatService = game:GetService("TextChatService")
+	local useNewChat = false
 	local chatEvents = nil
-	local success, err = pcall(function()
-		chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+	local saymsg, getmsg = nil, nil
+
+	-- Check if TextChatService is enabled
+	pcall(function()
+		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			useNewChat = true
+		end
 	end)
 
-	if not success or not chatEvents then
-		-- Chat system not found - add error message to chat window
-		local errorMsg = Instance.new("TextLabel")
-		errorMsg.Parent = chatScroll
-		errorMsg.Size = UDim2.new(1, -10, 0, 60)
-		errorMsg.BackgroundColor3 = CONFIG.Colors.AccentRed
-		errorMsg.BorderSizePixel = 0
-		errorMsg.Font = CONFIG.Font
-		errorMsg.Text = "⚠ Chat Spy Not Available\n\nDefaultChatSystemChatEvents not found.\nThis game may use a custom chat system or new TextChatService."
-		errorMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
-		errorMsg.TextSize = 12
-		errorMsg.TextWrapped = true
-		errorMsg.TextYAlignment = Enum.TextYAlignment.Top
-		createUICorner(6).Parent = errorMsg
+	if not useNewChat then
+		-- Try legacy chat system
+		local success, err = pcall(function()
+			chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+		end)
 
-		local msgPadding = Instance.new("UIPadding")
-		msgPadding.Parent = errorMsg
-		msgPadding.PaddingTop = UDim.new(0, 8)
-		msgPadding.PaddingLeft = UDim.new(0, 8)
-		msgPadding.PaddingRight = UDim.new(0, 8)
+		if success and chatEvents then
+			saymsg = chatEvents:FindFirstChild("SayMessageRequest")
+			getmsg = chatEvents:FindFirstChild("OnMessageDoneFiltering")
 
-		print("[CHAT SPY] Chat system not found - DefaultChatSystemChatEvents missing")
-		return false
+			if not saymsg or not getmsg then
+				-- Try TextChatService as fallback
+				useNewChat = true
+			end
+		else
+			-- Try TextChatService as fallback
+			useNewChat = true
+		end
 	end
 
-	local saymsg = chatEvents:FindFirstChild("SayMessageRequest")
-	local getmsg = chatEvents:FindFirstChild("OnMessageDoneFiltering")
-
-	if not saymsg or not getmsg then
-		-- Chat events not complete
+	-- Show error only if both systems fail
+	if not useNewChat and (not chatEvents or not saymsg or not getmsg) then
 		local errorMsg = Instance.new("TextLabel")
 		errorMsg.Parent = chatScroll
 		errorMsg.Size = UDim2.new(1, -10, 0, 60)
 		errorMsg.BackgroundColor3 = CONFIG.Colors.AccentRed
 		errorMsg.BorderSizePixel = 0
 		errorMsg.Font = CONFIG.Font
-		errorMsg.Text = "⚠ Chat Events Incomplete\n\nMissing: " .. (not saymsg and "SayMessageRequest " or "") .. (not getmsg and "OnMessageDoneFiltering" or "")
+		errorMsg.Text = "⚠ Chat Spy Not Available\n\nNo chat system detected (tried both Legacy and TextChatService)"
 		errorMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
 		errorMsg.TextSize = 12
 		errorMsg.TextWrapped = true
@@ -2032,7 +2345,7 @@ local function setupChatSpy(chatScroll)
 		msgPadding.PaddingLeft = UDim.new(0, 8)
 		msgPadding.PaddingRight = UDim.new(0, 8)
 
-		print("[CHAT SPY] Chat events incomplete")
+		print("[CHAT SPY] No chat system available")
 		return false
 	end
 
@@ -2110,42 +2423,108 @@ local function setupChatSpy(chatScroll)
 		end
 	end
 
-	-- Wrap connections in pcall for safety
-	local connectSuccess = pcall(function()
-		-- Connect to all players
-		for _, p in ipairs(Players:GetPlayers()) do
-			p.Chatted:Connect(function(msg) onChatted(p, msg) end)
-		end
+	-- Setup monitoring based on chat system
+	local connectSuccess = false
 
-		Players.PlayerAdded:Connect(function(p)
-			p.Chatted:Connect(function(msg) onChatted(p, msg) end)
-			addChatMessage("SYSTEM", p.Name .. " joined the game", false)
-		end)
+	if useNewChat then
+		-- NEW: TextChatService monitoring
+		print("[CHAT SPY] Using TextChatService")
+		connectSuccess = pcall(function()
+			-- Monitor incoming messages
+			TextChatService.MessageReceived:Connect(function(message)
+				local sourcePlayer = Players:GetPlayerByUserId(message.TextSource.UserId)
+				if sourcePlayer and sourcePlayer ~= player then
+					addChatMessage(sourcePlayer.Name, message.Text, false)
+				end
+			end)
 
-		Players.PlayerRemoving:Connect(function(p)
-			addChatMessage("SYSTEM", p.Name .. " left the game", false)
-		end)
-
-		-- Monitor public messages too
-		getmsg.OnClientEvent:Connect(function(packet, channel)
-			if packet.SpeakerUserId ~= player.UserId then
-				local senderPlayer = Players:GetPlayerByUserId(packet.SpeakerUserId)
-				if senderPlayer then
-					addChatMessage(senderPlayer.Name, packet.Message, false)
+			-- Monitor all text channels for messages
+			for _, textChannel in ipairs(TextChatService:GetChildren()) do
+				if textChannel:IsA("TextChannel") then
+					textChannel.MessageReceived:Connect(function(message)
+						if message.TextSource then
+							local sourcePlayer = Players:GetPlayerByUserId(message.TextSource.UserId)
+							if sourcePlayer and sourcePlayer ~= player then
+								-- Check if it's a whisper/private message
+								local isPrivate = message.Metadata and message.Metadata:find("Whisper") or false
+								addChatMessage(sourcePlayer.Name, message.Text, isPrivate)
+							end
+						end
+					end)
 				end
 			end
+
+			-- Monitor player joins/leaves
+			Players.PlayerAdded:Connect(function(p)
+				addChatMessage("SYSTEM", p.Name .. " joined the game", false)
+			end)
+
+			Players.PlayerRemoving:Connect(function(p)
+				addChatMessage("SYSTEM", p.Name .. " left the game", false)
+			end)
 		end)
-	end)
+	else
+		-- LEGACY: DefaultChatSystemChatEvents monitoring
+		print("[CHAT SPY] Using Legacy Chat System")
+		connectSuccess = pcall(function()
+			-- Monitor chat
+			local function onChatted(p, msg)
+				msg = msg:gsub("[\n\r]",''):gsub("\t",' '):gsub("[ ]+",' ')
+				local hidden = true
+
+				local conn = getmsg.OnClientEvent:Connect(function(packet, channel)
+					if packet.SpeakerUserId == p.UserId and packet.Message == msg:sub(#msg-#packet.Message+1) then
+						if channel == "All" or (channel == "Team" and Players[packet.FromSpeaker].Team == player.Team) then
+							hidden = false
+						end
+					end
+				end)
+
+				wait(1)
+				conn:Disconnect()
+
+				if hidden then
+					-- This is a private message
+					addChatMessage(p.Name, msg, true)
+				end
+			end
+
+			-- Connect to all players
+			for _, p in ipairs(Players:GetPlayers()) do
+				p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+			end
+
+			Players.PlayerAdded:Connect(function(p)
+				p.Chatted:Connect(function(msg) onChatted(p, msg) end)
+				addChatMessage("SYSTEM", p.Name .. " joined the game", false)
+			end)
+
+			Players.PlayerRemoving:Connect(function(p)
+				addChatMessage("SYSTEM", p.Name .. " left the game", false)
+			end)
+
+			-- Monitor public messages too
+			getmsg.OnClientEvent:Connect(function(packet, channel)
+				if packet.SpeakerUserId ~= player.UserId then
+					local senderPlayer = Players:GetPlayerByUserId(packet.SpeakerUserId)
+					if senderPlayer then
+						addChatMessage(senderPlayer.Name, packet.Message, false)
+					end
+				end
+			end)
+		end)
+	end
 
 	if connectSuccess then
 		-- Add success message to chat
 		local successMsg = Instance.new("TextLabel")
 		successMsg.Parent = chatScroll
-		successMsg.Size = UDim2.new(1, -10, 0, 40)
+		successMsg.Size = UDim2.new(1, -10, 0, 55)
 		successMsg.BackgroundColor3 = CONFIG.Colors.AccentGreen
 		successMsg.BorderSizePixel = 0
 		successMsg.Font = CONFIG.FontBold
-		successMsg.Text = "✓ Chat Spy Active\n\nMonitoring all chat messages including private/whisper messages"
+		local chatType = useNewChat and "TextChatService" or "Legacy Chat"
+		successMsg.Text = string.format("✓ Chat Spy Active (%s)\n\nMonitoring all chat messages", chatType)
 		successMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
 		successMsg.TextSize = 11
 		successMsg.TextWrapped = true
@@ -2158,9 +2537,28 @@ local function setupChatSpy(chatScroll)
 		successPadding.PaddingLeft = UDim.new(0, 8)
 		successPadding.PaddingRight = UDim.new(0, 8)
 
-		print("[CHAT SPY] Enabled successfully")
+		print("[CHAT SPY] Enabled successfully using " .. chatType)
 		return true
 	else
+		local errorMsg = Instance.new("TextLabel")
+		errorMsg.Parent = chatScroll
+		errorMsg.Size = UDim2.new(1, -10, 0, 50)
+		errorMsg.BackgroundColor3 = CONFIG.Colors.AccentRed
+		errorMsg.BorderSizePixel = 0
+		errorMsg.Font = CONFIG.Font
+		errorMsg.Text = "⚠ Chat Spy Failed\n\nFailed to connect to chat events"
+		errorMsg.TextColor3 = Color3.fromRGB(255, 255, 255)
+		errorMsg.TextSize = 12
+		errorMsg.TextWrapped = true
+		errorMsg.TextYAlignment = Enum.TextYAlignment.Top
+		createUICorner(6).Parent = errorMsg
+
+		local msgPadding = Instance.new("UIPadding")
+		msgPadding.Parent = errorMsg
+		msgPadding.PaddingTop = UDim.new(0, 8)
+		msgPadding.PaddingLeft = UDim.new(0, 8)
+		msgPadding.PaddingRight = UDim.new(0, 8)
+
 		print("[CHAT SPY] Failed to connect events")
 		return false
 	end
@@ -2204,7 +2602,7 @@ local function initialize()
 	end)
 
 	-- Populate Tools tab
-	populateToolsTab(toolsFrame)
+	populateToolsTab(toolsFrame, screenGui)
 
 	-- Populate Settings tab
 	populateSettingsTab(settingsFrame)
